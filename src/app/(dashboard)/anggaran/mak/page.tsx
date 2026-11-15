@@ -13,6 +13,7 @@ import {
   PieChart as PieChartIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
+import PemetaanIkuPublicPage from '@/app/iku/page';
 
 const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#94a3b8'];
 
@@ -116,8 +117,18 @@ export default function MonitoringMakPage() {
   const [activeTab, setActiveTab] = useState<'pic-report' | 'table' | 'chart'>('pic-report');
   const [pieViewMode, setPieViewMode] = useState<'unit' | 'status'>('unit');
   
-  // Main Section Tab: Tolakan Verifikator MAK vs Pengajuan Perubahan RKAT
-  const [mainSection, setMainSection] = useState<'tolakan-mak' | 'pengajuan-rkat'>('tolakan-mak');
+  // Main Section Tab: Tolakan Verifikator MAK vs Pengajuan Perubahan RKAT vs Katalog IKU
+  const [mainSection, setMainSection] = useState<'tolakan-mak' | 'pengajuan-rkat' | 'katalog-iku'>('tolakan-mak');
+  const [copiedLinkUrl, setCopiedLinkUrl] = useState<string | null>(null);
+
+  const handleCopyLinkUrl = (path: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : `https://portalkeu.vercel.app${path}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLinkUrl(path);
+      setTimeout(() => setCopiedLinkUrl(null), 2500);
+    });
+  };
 
   // Filters (Tolakan MAK)
   const [search, setSearch] = useState('');
@@ -831,20 +842,21 @@ export default function MonitoringMakPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* 🔴 TAB SWITCHER UTAMA: TOLAKAN VERIFIKATOR MAK vs PENGAJUAN PERUBAHAN RKAT */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/90 backdrop-blur-md p-2.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex items-center gap-2">
+      {/* 🔴 TAB SWITCHER UTAMA: 3 REKAP LAYANAN (MAK, RKAT, IKU) & PILIHAN LINK */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-2.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Tab 1: Revisi MAK */}
           <button
             type="button"
             onClick={() => setMainSection('tolakan-mak')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               mainSection === 'tolakan-mak'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-200 scale-[1.01]'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <ClipboardList size={15} />
-            <span>Tolakan Verifikator (MAK)</span>
+            <span>Rekap Revisi MAK Unit</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               mainSection === 'tolakan-mak' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
@@ -852,50 +864,120 @@ export default function MonitoringMakPage() {
             </span>
           </button>
 
+          {/* Tab 2: Perubahan RKAT */}
           <button
             type="button"
             onClick={() => setMainSection('pengajuan-rkat')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               mainSection === 'pengajuan-rkat'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-[1.01]'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <FileSpreadsheet size={15} />
-            <span>Pengajuan Perubahan RKAT</span>
+            <span>Rekap Perubahan RKAT</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               mainSection === 'pengajuan-rkat' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
             }`}>
               {rkatSubmissions.length}
             </span>
           </button>
+
+          {/* Tab 3: Katalog & Pemetaan IKU */}
+          <button
+            type="button"
+            onClick={() => setMainSection('katalog-iku')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              mainSection === 'katalog-iku'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Target size={15} />
+            <span>Katalog & Pemetaan IKU</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Sisi Kanan: Pilihan Link Akses Mandiri & Tombol Copy */}
+        <div className="flex flex-wrap items-center gap-1.5 self-end lg:self-auto">
+          <span className="text-[11px] font-bold text-slate-400 mr-1 hidden xl:inline">Link Publik:</span>
+
+          {/* Link Form MAK */}
+          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <Link
+              href="/input-mak"
+              target="_blank"
+              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-rose-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+              title="Buka form input MAK tanpa login"
+            >
+              <ExternalLink size={11} className="text-rose-500" />
+              <span>Form MAK</span>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              title="Salin link publik form MAK"
+            >
+              {copiedLinkUrl === '/input-mak' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
+            </button>
+          </div>
+
+          {/* Link Form RKAT */}
+          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <Link
+              href="/input-rkat"
+              target="_blank"
+              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-blue-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+              title="Buka form input RKAT tanpa login"
+            >
+              <ExternalLink size={11} className="text-blue-500" />
+              <span>Form RKAT</span>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              title="Salin link publik form RKAT"
+            >
+              {copiedLinkUrl === '/input-rkat' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
+            </button>
+          </div>
+
+          {/* Link Katalog IKU */}
+          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <Link
+              href="/iku"
+              target="_blank"
+              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+              title="Buka katalog IKU publik tanpa login"
+            >
+              <ExternalLink size={11} className="text-indigo-500" />
+              <span>Katalog IKU</span>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/iku', e)}
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              title="Salin link publik katalog IKU"
+            >
+              {copiedLinkUrl === '/iku' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
+            </button>
+          </div>
+
+          {/* Link Portal Layanan Publik */}
           <Link
-            href="/input-rkat"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
-            title="Buka formulir pengajuan perubahan RKAT mandiri tanpa login"
+            href="/anggaran/layanan-publik"
+            className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-95 transition-all"
+            title="Buka Pusat Layanan Publik Terpadu"
           >
-            <ExternalLink size={12} className="text-blue-600" />
-            <span>Form Publik RKAT</span>
-          </Link>
-          <Link
-            href="/iku"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
-            title="Buka kamus pemetaan referensi IKU publik tanpa login"
-          >
-            <Target size={12} />
-            <span>Katalog IKU</span>
+            <Sparkles size={12} />
+            <span>Portal Layanan</span>
           </Link>
         </div>
       </div>
 
-      {mainSection === 'tolakan-mak' ? (
+      {mainSection === 'tolakan-mak' && (
         <>
       {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
@@ -2102,7 +2184,9 @@ export default function MonitoringMakPage() {
         )}
       </div>
       </>
-      ) : (
+      )}
+
+      {mainSection === 'pengajuan-rkat' && (
       /* 🔵 TAMPILAN KHUSUS: TAB PENGAJUAN PERUBAHAN RKAT (MURNI TANPA TOLAKAN MAK) */
       <div className="space-y-4">
         {/* ROW 1: BANNER EXECUTIVE RKAT */}
@@ -2640,6 +2724,13 @@ export default function MonitoringMakPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* 🟣 TAMPILAN KHUSUS: TAB KATALOG & PEMETAAN IKU */}
+      {mainSection === 'katalog-iku' && (
+        <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs p-4 sm:p-6 animate-in fade-in duration-200">
+          <PemetaanIkuPublicPage hideHeader={true} />
+        </div>
       )}
 
       {/* Email Modal */}

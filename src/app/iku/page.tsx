@@ -57,7 +57,7 @@ const PIE_COLORS = [
   '#f59e0b', '#e11d48', '#f43f5e'
 ];
 
-export default function PemetaanIkuPublicPage() {
+export default function PemetaanIkuPublicPage({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const [selectedTahun, setSelectedTahun] = useState<string>('2026');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedRef, setSelectedRef] = useState<string>('ALL');
@@ -530,10 +530,10 @@ export default function PemetaanIkuPublicPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/40 text-slate-800 antialiased font-sans">
+    <div className={hideHeader ? "w-full text-slate-800 antialiased font-sans space-y-4" : "min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/40 text-slate-800 antialiased font-sans"}>
       
       {/* NAVBAR PUBLIK TERPADU & TOMBOL SALIN LINK PUBLIK */}
-      <PublicNavHeader currentPath="/iku" title="Katalog & Pemetaan IKU" />
+      {!hideHeader && <PublicNavHeader currentPath="/iku" title="Katalog & Pemetaan IKU" />}
 
       {/* TOAST NOTIFIKASI */}
       {toastMsg && (
