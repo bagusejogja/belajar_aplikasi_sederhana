@@ -88,6 +88,33 @@ export default function PublicNavHeader({ currentPath, title, subtitle, showTabs
       const urlParams = new URLSearchParams(window.location.search);
       if (isFrame || urlParams.get('embedded') === '1') {
         setIsEmbedded(true);
+
+        // Hapus paksa min-h-screen & overflow agar shrink-wrap content di dalam frame dan tidak loop
+        try {
+          document.documentElement.style.height = 'auto';
+          document.documentElement.style.minHeight = '0px';
+          document.body.style.height = 'auto';
+          document.body.style.minHeight = '0px';
+          document.body.style.overflow = 'hidden';
+          const els = document.querySelectorAll('.min-h-screen');
+          els.forEach((el) => {
+            (el as HTMLElement).style.minHeight = '0px';
+          });
+        } catch (e) {}
+
+        const postH = () => {
+          try {
+            const h = document.body.scrollHeight;
+            if (h && window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'PORTAL_EMBED_RESIZE', height: h }, '*');
+            }
+          } catch (e) {}
+        };
+
+        setTimeout(postH, 200);
+        setTimeout(postH, 800);
+        window.addEventListener('resize', postH);
+        return () => window.removeEventListener('resize', postH);
       }
     }
   }, []);

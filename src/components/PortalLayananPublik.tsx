@@ -39,44 +39,68 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
     }
   }, [activeTab]);
 
+  // Listener pesan postMessage dari iframe anak untuk auto-fit height yang aman tanpa loop
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'PORTAL_EMBED_RESIZE') {
+        const nextH = Math.max(Number(e.data.height) || 0, 400);
+        setIframeHeight(prev => {
+          // Hanya update jika perbedaan signifikan (> 25px) agar tidak terjadi looping
+          if (Math.abs(nextH - prev) > 25) {
+            return nextH + 10;
+          }
+          return prev;
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const handleIframeLoad = () => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const measureHeight = () => {
-      try {
-        if (!iframe.contentDocument) return;
-        const doc = iframe.contentDocument;
-        const body = doc.body;
-        const html = doc.documentElement;
-        if (body && html) {
-          const h = Math.max(
-            body.scrollHeight,
-            body.offsetHeight,
-            html.clientHeight,
-            html.scrollHeight,
-            html.offsetHeight
-          );
-          if (h > 300) {
-            setIframeHeight(h + 30);
-          }
-        }
-      } catch (err) {
-        // Fallback cross-origin iframes
-        setIframeHeight(850);
-      }
-    };
-
-    measureHeight();
-
-    // ResizeObserver & MutationObserver untuk auto-resize ketinggian iframe agar scroll hanya di halaman induk
     try {
       if (iframe.contentDocument && iframe.contentDocument.body) {
-        const ro = new ResizeObserver(() => measureHeight());
-        ro.observe(iframe.contentDocument.body);
+        const doc = iframe.contentDocument;
 
-        const mo = new MutationObserver(() => measureHeight());
-        mo.observe(iframe.contentDocument.body, { childList: true, subtree: true, attributes: true });
+        // Injeksi style pengaman ke dokumen iframe agar tidak memakai 100vh yang memicu looping
+        const styleId = 'embedded-safe-style';
+        if (!doc.getElementById(styleId)) {
+          const style = doc.createElement('style');
+          style.id = styleId;
+          style.innerHTML = `
+            html, body {
+              height: auto !important;
+              min-height: 0px !important;
+              overflow-y: hidden !important;
+            }
+            .min-h-screen {
+              min-height: 0px !important;
+            }
+          `;
+          doc.head.appendChild(style);
+        }
+
+        const measure = () => {
+          try {
+            if (!iframe.contentDocument || !iframe.contentDocument.body) return;
+            const h = iframe.contentDocument.body.scrollHeight;
+            if (h > 300) {
+              setIframeHeight(prev => {
+                if (Math.abs(h - prev) > 25) {
+                  return h + 10;
+                }
+                return prev;
+              });
+            }
+          } catch (e) {}
+        };
+
+        measure();
+        setTimeout(measure, 300);
+        setTimeout(measure, 800);
       }
     } catch (e) {
       // ignore cross-origin error
@@ -107,7 +131,7 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
     : (embeddedInDashboard ? 'pb-12' : 'pb-20');
 
   return (
-    <div className={`min-h-screen bg-slate-50/70 ${containerPadding}`}>
+    <div className={`${embeddedInDashboard ? 'w-full' : 'min-h-screen'} bg-slate-50/70 ${containerPadding}`}>
       {/* Top Navbar if accessed as public standalone */}
       {!embeddedInDashboard && (
         <PublicNavHeader currentPath="/layanan-publik" title="Pusat Layanan Publik" />
