@@ -13,6 +13,7 @@ import { useSearchParams } from 'next/navigation';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import PublicNavHeader from '@/components/PublicNavHeader';
+import toast from 'react-hot-toast';
 
 export interface RkaDiffItem {
   row: number;
@@ -532,6 +533,9 @@ function InputMakPageContent() {
         let newExcelUrl = null;
         const effectiveExcel = excelFile || rkaFile;
         if (effectiveExcel) {
+          if (effectiveExcel.size > 4.5 * 1024 * 1024) {
+            throw new Error(`Ukuran file Excel (${(effectiveExcel.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas 4.5 MB.`);
+          }
           newExcelUrl = await handleUpload(effectiveExcel, 'mak_excel');
         }
 
@@ -539,6 +543,9 @@ function InputMakPageContent() {
         if (noteFiles && noteFiles.length > 0) {
           for (let i = 0; i < noteFiles.length; i++) {
             const file = noteFiles[i];
+            if (file.size > 4.5 * 1024 * 1024) {
+              throw new Error(`Ukuran file "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas 4.5 MB.`);
+            }
             const url = await handleUpload(file, 'mak_notes');
             newNoteUrls.push({ url, name: file.name });
           }
@@ -559,11 +566,16 @@ function InputMakPageContent() {
         const json = await res.json();
         if (json.success) {
           setSuccess(true);
+          toast.success('Berkas perbaikan revisi berhasil dikirim ulang!', { duration: 6000 });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           throw new Error(json.error || 'Gagal mengirim perbaikan berkas revisi.');
         }
       } catch (err: any) {
-        setErrorMsg(err.message || 'Terjadi kesalahan saat mengirim berkas revisi');
+        const msg = err.message || 'Terjadi kesalahan saat mengirim berkas revisi';
+        setErrorMsg(msg);
+        toast.error(msg, { duration: 6000 });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         setIsLoading(false);
       }
@@ -571,14 +583,39 @@ function InputMakPageContent() {
     }
 
     try {
-      const selectedUnit = units.find(u => u.nama_unit.toLowerCase() === unitSearch.toLowerCase());
+      const trimmedUnit = (unitSearch || '').trim();
+      if (!trimmedUnit) {
+        throw new Error('Unit Kerja wajib diisi. Silakan ketik nama unit dan pilih dari saran dropdown.');
+      }
+
+      const selectedUnit = units.find(u => u.nama_unit.toLowerCase() === trimmedUnit.toLowerCase());
       if (!selectedUnit) {
-        throw new Error('Unit Kerja tidak valid. Silakan pilih dari saran yang muncul.');
+        throw new Error(`Unit Kerja "${trimmedUnit}" tidak ditemukan dalam daftar resmi. Harap klik salah satu nama unit yang muncul di daftar saran dropdown.`);
+      }
+
+      if (!email || !email.trim() || !email.includes('@')) {
+        throw new Error('Email pengaju wajib diisi dengan format email yang valid (contoh: unit@ugm.ac.id).');
       }
 
       const effectiveExcel = excelFile || rkaFile;
-      if (!email || !tahun || !effectiveExcel || !noteFiles || noteFiles.length === 0) {
-        throw new Error('Harap lengkapi semua field dan dokumen (Email, Unit, Catatan, serta File Excel Matrik/RKA)!');
+      if (!effectiveExcel) {
+        throw new Error('File Excel usulan wajib diunggah (File Perubahan RKAT atau Matrik Usulan).');
+      }
+
+      if (!noteFiles || noteFiles.length === 0) {
+        throw new Error('Dokumen Catatan / Nota Dinas Usulan wajib dilampirkan (minimal 1 file PDF/Gambar).');
+      }
+
+      // Validasi batas ukuran file (Vercel max request body limit 4.5 MB)
+      const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+      if (effectiveExcel.size > MAX_FILE_SIZE) {
+        throw new Error(`Ukuran file Excel "${effectiveExcel.name}" (${(effectiveExcel.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 4.5 MB.`);
+      }
+
+      for (let i = 0; i < noteFiles.length; i++) {
+        if (noteFiles[i].size > MAX_FILE_SIZE) {
+          throw new Error(`Ukuran dokumen "${noteFiles[i].name}" (${(noteFiles[i].size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 4.5 MB.`);
+        }
       }
 
       // Upload excel utama
@@ -600,7 +637,7 @@ function InputMakPageContent() {
       }
 
       const payload: any = {
-        email: email,
+        email: email.trim(),
         unit: selectedUnit.nama_unit,
         pic: pic || selectedUnit.pic || '-',
         tahun: tahun,
@@ -680,6 +717,9 @@ function InputMakPageContent() {
       }
 
       setSuccess(true);
+      toast.success('Pengajuan MAK Berhasil Dikirim dan Tersimpan!', { duration: 6000 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
       setUnitSearch('');
       setPic('');
       setEmail('');
@@ -697,7 +737,10 @@ function InputMakPageContent() {
 
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Terjadi kesalahan saat menyimpan data.');
+      const msg = err.message || 'Terjadi kesalahan saat menyimpan data.';
+      setErrorMsg(msg);
+      toast.error(msg, { duration: 6000 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsLoading(false);
     }
@@ -1056,14 +1099,6 @@ function InputMakPageContent() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                    <Link
-                      href="/perubahan-rkat"
-                      className="h-8 px-3 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-                      title="Buka menu khusus Cek Perubahan RKAT"
-                    >
-                      <ExternalLink size={13} className="text-indigo-600" />
-                      <span>Menu Cek Perubahan</span>
-                    </Link>
                     <a
                       href="/template.xlsx"
                       download="template-perubahan-rkat.xlsx"
@@ -1503,6 +1538,17 @@ function InputMakPageContent() {
                 placeholder="Tuliskan keterangan berkas yang Anda perbaiki, misalnya: 'Excel sudah diperbaiki kolom selisihnya dan nota dinas persetujuan telah kami lampirkan'..."
                 className="w-full p-3 bg-white border border-amber-200 rounded-xl text-xs text-gray-800 outline-none focus:ring-2 focus:ring-amber-500/20"
               />
+            </div>
+          )}
+
+          {/* Pesan Kesalahan Dekat Tombol Submit */}
+          {errorMsg && (
+            <div className="p-4 bg-red-50 text-red-700 rounded-2xl flex items-start gap-3 border border-red-200 shadow-xs animate-in fade-in duration-200">
+              <AlertCircle className="shrink-0 mt-0.5 text-red-600" size={20} />
+              <div className="space-y-0.5 flex-1">
+                <p className="font-extrabold text-sm text-red-900">Pengajuan Belum Dapat Dikirim</p>
+                <p className="font-medium text-xs text-red-700 leading-snug">{errorMsg}</p>
+              </div>
             </div>
           )}
 
