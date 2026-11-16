@@ -31,7 +31,7 @@ interface IkuItem {
 }
 
 let cachedData: {
-  masterReferences: Array<{ id: number; ref_tahun_iku: number; nama_ref_iku: string }>;
+  masterReferences: Array<{ id: number; ref_tahun_iku: number; nama_ref_iku: string; uraian?: string }>;
   mappings: IkuItem[];
 } | null = null;
 
@@ -151,6 +151,7 @@ export async function GET(req: NextRequest) {
     const groupedMap = new Map<string, {
       ref_iku: string;
       ref_tahun_iku: number;
+      uraian?: string;
       count: number;
       items: IkuItem[];
     }>();
@@ -163,6 +164,7 @@ export async function GET(req: NextRequest) {
         groupedMap.set(unmappedKey, {
           ref_iku: 'Belum Ada IKU',
           ref_tahun_iku: tahunParam === 'all' ? 0 : Number(tahunParam),
+          uraian: '',
           count: 0,
           items: []
         });
@@ -173,6 +175,7 @@ export async function GET(req: NextRequest) {
         groupedMap.set(key, {
           ref_iku: refParam,
           ref_tahun_iku: thn,
+          uraian: targetMaster?.uraian || '',
           count: 0,
           items: []
         });
@@ -184,6 +187,7 @@ export async function GET(req: NextRequest) {
         groupedMap.set(key, {
           ref_iku: m.nama_ref_iku,
           ref_tahun_iku: m.ref_tahun_iku,
+          uraian: m.uraian || '',
           count: 0,
           items: []
         });
@@ -194,6 +198,7 @@ export async function GET(req: NextRequest) {
       groupedMap.set(unmappedKey, {
         ref_iku: 'Belum Ada IKU',
         ref_tahun_iku: tahunParam === 'all' ? 0 : Number(tahunParam),
+        uraian: '',
         count: 0,
         items: []
       });
@@ -211,9 +216,11 @@ export async function GET(req: NextRequest) {
       const key = `${item.ref_tahun_iku}___${itemRef}`;
       let group = groupedMap.get(key);
       if (!group) {
+        const targetMaster = filteredMasters.find(m => m.nama_ref_iku === itemRef);
         group = {
           ref_iku: itemRef,
           ref_tahun_iku: item.ref_tahun_iku,
+          uraian: targetMaster?.uraian || '',
           count: 0,
           items: []
         };

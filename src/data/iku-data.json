@@ -4,87 +4,104 @@
     {
       "id": 1,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 1. Angka Efisiensi Edukasi perguruan tinggi (AEE PT)"
+      "nama_ref_iku": "IKU 1. Angka Efisiensi Edukasi perguruan tinggi (AEE PT)",
+      "uraian": "Indikator yang mengukur tingkat keberhasilan mahasiswa menyelesaikan studi tepat waktu sesuai masa studi standar, dibandingkan dengan total mahasiswa yang masuk pada periode tertentu.\nIndikator AEE Perguruan Tinggi dihitung berdasarkan nilai rata-rata dari tingkat pencapaian AEE dari setiap jenjang pendidikan dalam Perguruan Tinggi."
     },
     {
       "id": 2,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 2. Persentase lulusan pendidikan tinggi program diploma satu, diploma dua, diploma tiga, diploma empat/sarjana terapan, dan sarjana yang langsung bekerja, berwirausaha, atau melanjutkan studi dalam jangka waktu 1 (satu) tahun setelah kelulusan, serta sudah bekerja, atau berwirausaha sebelum lulus kuliah"
+      "nama_ref_iku": "IKU 2. Persentase lulusan pendidikan tinggi program diploma satu, diploma dua, diploma tiga, diploma empat/sarjana terapan, dan sarjana yang langsung bekerja, berwirausaha, atau melanjutkan studi dalam jangka waktu 1 (satu) tahun setelah kelulusan, serta sudah bekerja, atau berwirausaha sebelum lulus kuliah",
+      "uraian": "Indikator ini mengukur persentase lulusan pendidikan tinggi (akademik, vokasi, dan profesi) yang memiliki aktivitas produktif berupa bekerja, melanjutkan studi ke jenjang lebih tinggi, atau berwirausaha dalam jangka waktu maksimal 12 bulan setelah kelulusan, berdasarkan hasil tracer study yang terverifikasi oleh perguruan tinggi dan terekam dalam sistem pelaporan nasional PDDikti atau Tracer Study.\nIndikator ini digunakan untuk menilai daya serap lulusan di dunia kerja, kesiapan kompetensi lulusan, dan relevansi pendidikan tinggi terhadap kebutuhan pasar kerja dan kewirausahaan."
     },
     {
       "id": 3,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 3. Persentase mahasiswa program Diploma dan Sarjana yang berkegiatan/meraih prestasi di luar program studi"
+      "nama_ref_iku": "IKU 3. Persentase mahasiswa program Diploma dan Sarjana yang berkegiatan/meraih prestasi di luar program studi",
+      "uraian": "Indikator ini mengukur persentase mahasiswa aktif jenjang Sarjana (S1) dan Diploma (D4/D3/D2/D1) yang mengikuti kegiatan pembelajaran, penelitian, pengabdian, kewirausahaan, atau kompetisi di luar program studinya, baik di lingkungan internal maupun eksternal perguruan tinggi, serta meraih prestasi yang diakui secara resmi oleh perguruan tinggi, lembaga nasional, atau internasional dalam periode tertentu."
     },
     {
       "id": 4,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 4. Persentase Dosen perguruan tinggi yang mendapatkan rekognisi internasional atau hasil penelitiannya diterapkan oleh masyarakat"
+      "nama_ref_iku": "IKU 4. Persentase Dosen perguruan tinggi yang mendapatkan rekognisi internasional atau hasil penelitiannya diterapkan oleh masyarakat",
+      "uraian": "Indikator ini mengukur persentase jumlah dosen tetap yang memiliki kualifikasi akademik Doktor (S3) dan tercatat aktif dalam Pangkalan Data Pendidikan Tinggi (PDDikti) pada tahun berjalan dibandingkan dengan total keseluruhan dosen tetap aktif pada perguruan tinggi tersebut pada periode yang sama."
     },
     {
       "id": 5,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 5. Persentase luaran hasil kerja sama dan hilirisasi antara perguruan tinggi dengan industri/Lembaga"
+      "nama_ref_iku": "IKU 5. Persentase luaran hasil kerja sama dan hilirisasi antara perguruan tinggi dengan industri/Lembaga",
+      "uraian": "Indikator ini mengukur rasio antara jumlah luaran hasil kerja sama perguruan tinggi dengan start-up, industri, lembaga pemerintah, lembaga masyarakat, atau lembaga internasional terhadap jumlah total kerja sama yang dilaksanakan dalam periode tertentu."
     },
     {
       "id": 6,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 6. Persentase publikasi bereputasi internasional (Scopus/WoS)"
+      "nama_ref_iku": "IKU 6. Persentase publikasi bereputasi internasional (Scopus/WoS)",
+      "uraian": "Indikator ini mengukur proporsi publikasi hasil riset perguruan tinggi yang terindeks pada basis data internasional bereputasi (Scopus dan/atau Web of Science) dibandingkan dengan total publikasi yang dihasilkan perguruan tinggi dalam periode tertentu. Indikator ini merupakan indikator wajib bagi PTN-BH. Namun dapat menjadi indikator pilihan bagi perguruan tinggi lainnya."
     },
     {
       "id": 7,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 7. Persentase keterlibatan perguruan tinggi dalam SDG 1 (Tanpa Kemiskinan), SDG 4 (Pendidikan Berkualitas), SDG 17 (Kemitraan), dan 2 (dua) SDGs lain sesuai keunggulan"
+      "nama_ref_iku": "IKU 7. Persentase keterlibatan perguruan tinggi dalam SDG 1 (Tanpa Kemiskinan), SDG 4 (Pendidikan Berkualitas), SDG 17 (Kemitraan), dan 2 (dua) SDGs lain sesuai keunggulan",
+      "uraian": "Indikator yang mengukur proporsi program, kegiatan, penelitian, pengabdian kepada masyarakat, kerja sama, atau inisiatif lain yang dilaksanakan perguruan tinggi dan secara langsung berkontribusi pada pencapaian Sustainable Development Goals (SDGs). Dengan ketentuan bahwa keterlibatan pada SDG 1 (No Poverty), SDG 4 (Quality Education), dan SDG 17 (Partnership for the Goals) bersifat wajib, serta ditambah dengan 2 (dua) SDGs lain yang dipilih sesuai keunggulan, spesialisasi, atau konteks strategis masing-masing perguruan tinggi."
     },
     {
       "id": 8,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 8. Persentase Sumber Daya Manusia (SDM) perguruan tinggi yang terlibat langsung dalam penyusunan kebijakan (nasional/daerah/industri)"
+      "nama_ref_iku": "IKU 8. Persentase Sumber Daya Manusia (SDM) perguruan tinggi yang terlibat langsung dalam penyusunan kebijakan (nasional/daerah/industri)",
+      "uraian": "Indikator yang mengukur jumlah dosen, peneliti, dan/atau perekayasa dari perguruan tinggi yang secara resmi ditugaskan atau diakui sebagai anggota tim, narasumber, ahli, atau kontributor dalam proses penyusunan kebijakan publik di tingkat nasional, daerah, maupun sektor industri, pada periode tertentu.\nIndikator ini merupakan indikator pilihan bagi perguruan tinggi."
     },
     {
       "id": 9,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 9. Persentase pendapatan/penghasilan dari bidang nonakademik (selain UKT/uang kuliah)"
+      "nama_ref_iku": "IKU 9. Persentase pendapatan/penghasilan dari bidang nonakademik (selain UKT/uang kuliah)",
+      "uraian": "Indikator yang mengukur proporsi pendapatan perguruan tinggi yang berasal dari sumber selain biaya pendidikan mahasiswa (SPP/UKT atau sejenisnya), meliputi pendapatan dari riset dan inovasi, kerja sama dan layanan, serta usaha dan unit bisnis perguruan tinggi, dibandingkan dengan total pendapatan perguruan tinggi pada periode tertentu. Indikator ini merupakan indikator wajib bagi semua perguruan tinggi."
     },
     {
       "id": 10,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 10. Zona Integritas yang terdiri dari Wilayah Bebas dari Korupsi (WBK) dan Wilayah Birokrasi Bersih dan Melayani (WBBM)"
+      "nama_ref_iku": "IKU 10. Zona Integritas yang terdiri dari Wilayah Bebas dari Korupsi (WBK) dan Wilayah Birokrasi Bersih dan Melayani (WBBM)",
+      "uraian": "Indikator yang mengukur jumlah unit kerja atau fakultas/institusi di lingkungan perguruan tinggi yang secara resmi mengajukan usulan pembangunan Zona Integritas menuju predikat Wilayah Bebas dari Korupsi (WBK) dan/atau Wilayah Birokrasi Bersih Melayani (WBBM) kepada Kementerian yang berwenang dalam periode tertentu. Usulan yang dihitung adalah usulan yang telah memenuhi ketentuan dan melewati tahapan penilaian awal (passing grade) sesuai dengan Pedoman Pembangunan Zona Integritas yang diterbitkan oleh Kementerian PANRB. Indikator ini merupakan indikator pilihan bagi perguruan tinggi."
     },
     {
       "id": 11,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 11-a. Hasil audit atas Laporan Keuangan perguruan tinggi"
+      "nama_ref_iku": "IKU 11-a. Hasil audit atas Laporan Keuangan perguruan tinggi",
+      "uraian": "Indikator yang mengukur capaian opini Wajar Tanpa Pengecualian (WTP) yang diberikan oleh Badan Pemeriksa Keuangan (BPK) atau auditor independen yang berwenang atas laporan keuangan perguruan tinggi, yang menunjukkan bahwa laporan keuangan tersebut telah disajikan secara wajar sesuai dengan standar akuntansi pemerintahan atau standar akuntansi keuangan yang berlaku."
     },
     {
       "id": 12,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 11-b. Predikat Sistem Akuntabilitas Kinerja Instansi Pemerintah (SAKIP) Perguruan Tinggi"
+      "nama_ref_iku": "IKU 11-b. Predikat Sistem Akuntabilitas Kinerja Instansi Pemerintah (SAKIP) Perguruan Tinggi",
+      "uraian": "Indikator ini mengukur tingkat efektivitas dan akuntabilitas kinerja perguruan tinggi melalui hasil evaluasi pelaksanaan Sistem Akuntabilitas Kinerja Instansi Pemerintah (SAKIP) oleh Kementerian PANRB atau Inspektorat Jenderal. Penilaian mencakup perencanaan, pelaksanaan, pengukuran, pelaporan, dan evaluasi kinerja perguruan tinggi yang berorientasi hasil (outcome)."
     },
     {
       "id": 13,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 11-c. Pencegahan dan Penanganan Pelanggaran Integritas Akademik"
+      "nama_ref_iku": "IKU 11-c. Pencegahan dan Penanganan Pelanggaran Integritas Akademik",
+      "uraian": "Indikator ini mengukur jumlah laporan dugaan pelanggaran integritas akademik yang diterima dan tercatat secara resmi melalui sistem aplikasi Anjani (Anjungan Integritas Akademik Indonesia) atau sistem pelaporan internal perguruan tinggi yang terintegrasi dengan Anjani dalam periode tertentu."
     },
     {
       "id": 14,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 11-d. Pencegahan dan Penanganan Anti Kekerasan; Anti Narkotika, Psikotropika dan Bahan Adiktif berbahaya lainnya (narkoba); dan Anti Korupsi"
+      "nama_ref_iku": "IKU 11-d. Pencegahan dan Penanganan Anti Kekerasan; Anti Narkotika, Psikotropika dan Bahan Adiktif berbahaya lainnya (narkoba); dan Anti Korupsi",
+      "uraian": "Indikator yang mengukur komitmen, kapasitas, dan efektivitas perguruan tinggi dalam mencegah dan menangani tiga bentuk pelanggaran integritas utama kekerasan, penyalahgunaan narkoba, dan tindak korupsi melalui sistem tata kelola, kebijakan, dan mekanisme penanganan yang terukur dan terdokumentasi."
     },
     {
       "id": 15,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "IKU 12. Ketersediaan perencanaan strategis peningkatan kesejahteraan dosen"
+      "nama_ref_iku": "IKU 12. Ketersediaan perencanaan strategis peningkatan kesejahteraan dosen",
+      "uraian": "--"
     },
     {
       "id": 16,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "Nilai Kinerja Anggaran atas Pelaksanaan RKA-K/L"
+      "nama_ref_iku": "Nilai Kinerja Anggaran atas Pelaksanaan RKA-K/L",
+      "uraian": "---"
     },
     {
       "id": 17,
       "ref_tahun_iku": 2026,
-      "nama_ref_iku": "Jumlah lokasi KKN-PPM di daerah terpencil, tertinggal, perbatasan, dan kepulauan"
+      "nama_ref_iku": "Jumlah lokasi KKN-PPM di daerah terpencil, tertinggal, perbatasan, dan kepulauan",
+      "uraian": "----"
     },
     {
       "id": 18,

@@ -8,7 +8,7 @@ import {
   RefreshCw, FileSpreadsheet, ArrowLeft, Building2, HelpCircle,
   Trash2, ArrowRightLeft, AlertTriangle, RotateCcw,
   Check, X, Eye, EyeOff, PieChart as PieChartIcon, CheckSquare, Square,
-  Lock, Unlock
+  Lock, Unlock, Info
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import {
@@ -47,8 +47,66 @@ interface IkuItem {
 interface IkuGroup {
   ref_iku: string;
   ref_tahun_iku: number;
+  uraian?: string;
   count: number;
   items: IkuItem[];
+}
+
+export const IKU_URAIAN_2026: Record<string, string> = {
+  'IKU 1. Angka Efisiensi Edukasi perguruan tinggi (AEE PT)':
+    'Indikator yang mengukur tingkat keberhasilan mahasiswa menyelesaikan studi tepat waktu sesuai masa studi standar, dibandingkan dengan total mahasiswa yang masuk pada periode tertentu.\nIndikator AEE Perguruan Tinggi dihitung berdasarkan nilai rata-rata dari tingkat pencapaian AEE dari setiap jenjang pendidikan dalam Perguruan Tinggi.',
+
+  'IKU 2. Persentase lulusan pendidikan tinggi program diploma satu, diploma dua, diploma tiga, diploma empat/sarjana terapan, dan sarjana yang langsung bekerja, berwirausaha, atau melanjutkan studi dalam jangka waktu 1 (satu) tahun setelah kelulusan, serta sudah bekerja, atau berwirausaha sebelum lulus kuliah':
+    'Indikator ini mengukur persentase lulusan pendidikan tinggi (akademik, vokasi, dan profesi) yang memiliki aktivitas produktif berupa bekerja, melanjutkan studi ke jenjang lebih tinggi, atau berwirausaha dalam jangka waktu maksimal 12 bulan setelah kelulusan, berdasarkan hasil tracer study yang terverifikasi oleh perguruan tinggi dan terekam dalam sistem pelaporan nasional PDDikti atau Tracer Study.\nIndikator ini digunakan untuk menilai daya serap lulusan di dunia kerja, kesiapan kompetensi lulusan, dan relevansi pendidikan tinggi terhadap kebutuhan pasar kerja dan kewirausahaan.',
+
+  'IKU 3. Persentase mahasiswa program Diploma dan Sarjana yang berkegiatan/meraih prestasi di luar program studi':
+    'Indikator ini mengukur persentase mahasiswa aktif jenjang Sarjana (S1) dan Diploma (D4/D3/D2/D1) yang mengikuti kegiatan pembelajaran, penelitian, pengabdian, kewirausahaan, atau kompetisi di luar program studinya, baik di lingkungan internal maupun eksternal perguruan tinggi, serta meraih prestasi yang diakui secara resmi oleh perguruan tinggi, lembaga nasional, atau internasional dalam periode tertentu.',
+
+  'IKU 4. Persentase Dosen perguruan tinggi yang mendapatkan rekognisi internasional atau hasil penelitiannya diterapkan oleh masyarakat':
+    'Indikator ini mengukur persentase jumlah dosen tetap yang memiliki kualifikasi akademik Doktor (S3) dan tercatat aktif dalam Pangkalan Data Pendidikan Tinggi (PDDikti) pada tahun berjalan dibandingkan dengan total keseluruhan dosen tetap aktif pada perguruan tinggi tersebut pada periode yang sama.',
+
+  'IKU 5. Persentase luaran hasil kerja sama dan hilirisasi antara perguruan tinggi dengan industri/Lembaga':
+    'Indikator ini mengukur rasio antara jumlah luaran hasil kerja sama perguruan tinggi dengan start-up, industri, lembaga pemerintah, lembaga masyarakat, atau lembaga internasional terhadap jumlah total kerja sama yang dilaksanakan dalam periode tertentu.',
+
+  'IKU 6. Persentase publikasi bereputasi internasional (Scopus/WoS)':
+    'Indikator ini mengukur proporsi publikasi hasil riset perguruan tinggi yang terindeks pada basis data internasional bereputasi (Scopus dan/atau Web of Science) dibandingkan dengan total publikasi yang dihasilkan perguruan tinggi dalam periode tertentu. Indikator ini merupakan indikator wajib bagi PTN-BH. Namun dapat menjadi indikator pilihan bagi perguruan tinggi lainnya.',
+
+  'IKU 7. Persentase keterlibatan perguruan tinggi dalam SDG 1 (Tanpa Kemiskinan), SDG 4 (Pendidikan Berkualitas), SDG 17 (Kemitraan), dan 2 (dua) SDGs lain sesuai keunggulan':
+    'Indikator yang mengukur proporsi program, kegiatan, penelitian, pengabdian kepada masyarakat, kerja sama, atau inisiatif lain yang dilaksanakan perguruan tinggi dan secara langsung berkontribusi pada pencapaian Sustainable Development Goals (SDGs). Dengan ketentuan bahwa keterlibatan pada SDG 1 (No Poverty), SDG 4 (Quality Education), dan SDG 17 (Partnership for the Goals) bersifat wajib, serta ditambah dengan 2 (dua) SDGs lain yang dipilih sesuai keunggulan, spesialisasi, atau konteks strategis masing-masing perguruan tinggi.',
+
+  'IKU 8. Persentase Sumber Daya Manusia (SDM) perguruan tinggi yang terlibat langsung dalam penyusunan kebijakan (nasional/daerah/industri)':
+    'Indikator yang mengukur jumlah dosen, peneliti, dan/atau perekayasa dari perguruan tinggi yang secara resmi ditugaskan atau diakui sebagai anggota tim, narasumber, ahli, atau kontributor dalam proses penyusunan kebijakan publik di tingkat nasional, daerah, maupun sektor industri, pada periode tertentu.\nIndikator ini merupakan indikator pilihan bagi perguruan tinggi.',
+
+  'IKU 9. Persentase pendapatan/penghasilan dari bidang nonakademik (selain UKT/uang kuliah)':
+    'Indikator yang mengukur proporsi pendapatan perguruan tinggi yang berasal dari sumber selain biaya pendidikan mahasiswa (SPP/UKT atau sejenisnya), meliputi pendapatan dari riset dan inovasi, kerja sama dan layanan, serta usaha dan unit bisnis perguruan tinggi, dibandingkan dengan total pendapatan perguruan tinggi pada periode tertentu. Indikator ini merupakan indikator wajib bagi semua perguruan tinggi.',
+
+  'IKU 10. Zona Integritas yang terdiri dari Wilayah Bebas dari Korupsi (WBK) dan Wilayah Birokrasi Bersih dan Melayani (WBBM)':
+    'Indikator yang mengukur jumlah unit kerja atau fakultas/institusi di lingkungan perguruan tinggi yang secara resmi mengajukan usulan pembangunan Zona Integritas menuju predikat Wilayah Bebas dari Korupsi (WBK) dan/atau Wilayah Birokrasi Bersih Melayani (WBBM) kepada Kementerian yang berwenang dalam periode tertentu. Usulan yang dihitung adalah usulan yang telah memenuhi ketentuan dan melewati tahapan penilaian awal (passing grade) sesuai dengan Pedoman Pembangunan Zona Integritas yang diterbitkan oleh Kementerian PANRB. Indikator ini merupakan indikator pilihan bagi perguruan tinggi.',
+
+  'IKU 11-a. Hasil audit atas Laporan Keuangan perguruan tinggi':
+    'Indikator yang mengukur capaian opini Wajar Tanpa Pengecualian (WTP) yang diberikan oleh Badan Pemeriksa Keuangan (BPK) atau auditor independen yang berwenang atas laporan keuangan perguruan tinggi, yang menunjukkan bahwa laporan keuangan tersebut telah disajikan secara wajar sesuai dengan standar akuntansi pemerintahan atau standar akuntansi keuangan yang berlaku.',
+
+  'IKU 11-b. Predikat Sistem Akuntabilitas Kinerja Instansi Pemerintah (SAKIP) Perguruan Tinggi':
+    'Indikator ini mengukur tingkat efektivitas dan akuntabilitas kinerja perguruan tinggi melalui hasil evaluasi pelaksanaan Sistem Akuntabilitas Kinerja Instansi Pemerintah (SAKIP) oleh Kementerian PANRB atau Inspektorat Jenderal. Penilaian mencakup perencanaan, pelaksanaan, pengukuran, pelaporan, dan evaluasi kinerja perguruan tinggi yang berorientasi hasil (outcome).',
+
+  'IKU 11-c. Pencegahan dan Penanganan Pelanggaran Integritas Akademik':
+    'Indikator ini mengukur jumlah laporan dugaan pelanggaran integritas akademik yang diterima dan tercatat secara resmi melalui sistem aplikasi Anjani (Anjungan Integritas Akademik Indonesia) atau sistem pelaporan internal perguruan tinggi yang terintegrasi dengan Anjani dalam periode tertentu.',
+
+  'IKU 11-d. Pencegahan dan Penanganan Anti Kekerasan; Anti Narkotika, Psikotropika dan Bahan Adiktif berbahaya lainnya (narkoba); dan Anti Korupsi':
+    'Indikator yang mengukur komitmen, kapasitas, dan efektivitas perguruan tinggi dalam mencegah dan menangani tiga bentuk pelanggaran integritas utama kekerasan, penyalahgunaan narkoba, dan tindak korupsi melalui sistem tata kelola, kebijakan, dan mekanisme penanganan yang terukur dan terdokumentasi.',
+
+  'IKU 12. Ketersediaan perencanaan strategis peningkatan kesejahteraan dosen': '--',
+  'Nilai Kinerja Anggaran atas Pelaksanaan RKA-K/L': '---',
+  'Jumlah lokasi KKN-PPM di daerah terpencil, tertinggal, perbatasan, dan kepulauan': '----'
+};
+
+export function getIkuUraian(group: { ref_iku: string; uraian?: string }): string | null {
+  if (group.uraian && group.uraian.trim()) return group.uraian;
+  if (IKU_URAIAN_2026[group.ref_iku]) return IKU_URAIAN_2026[group.ref_iku];
+  for (const [key, val] of Object.entries(IKU_URAIAN_2026)) {
+    if (group.ref_iku.toLowerCase().trim() === key.toLowerCase().trim()) return val;
+  }
+  return null;
 }
 
 const PIE_COLORS = [
@@ -66,7 +124,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
   const [loading, setLoading] = useState<boolean>(true);
   const [groups, setGroups] = useState<IkuGroup[]>([]);
-  const [masters, setMasters] = useState<Array<{ id: number; ref_tahun_iku: number; nama_ref_iku: string }>>([]);
+  const [masters, setMasters] = useState<Array<{ id: number; ref_tahun_iku: number; nama_ref_iku: string; uraian?: string }>>([]);
   const [totalMatched, setTotalMatched] = useState<number>(0);
 
   // POIN 2: Accordion default tertutup semua saja
@@ -966,6 +1024,15 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           <p className="leading-snug break-words whitespace-normal font-semibold">
                             {m.nama_ref_iku}
                           </p>
+                          {(() => {
+                            const u = getIkuUraian({ ref_iku: m.nama_ref_iku, uraian: m.uraian });
+                            if (!u || u.startsWith('-')) return null;
+                            return (
+                              <p className="text-[10px] text-slate-500 line-clamp-2 leading-tight font-normal">
+                                {u}
+                              </p>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -1126,6 +1193,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                 const groupKey = `${group.ref_tahun_iku}_${group.ref_iku}`;
                 const isExpanded = !!expandedGroups[groupKey];
                 const isUnmapped = group.ref_iku === 'Belum Ada IKU';
+                const groupUraian = getIkuUraian(group);
 
                 // Paging di dalam tabel kegiatan grup accordion (15 kegiatan per page)
                 const currentInnerPage = innerPages[groupKey] || 1;
@@ -1136,19 +1204,24 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                   <div
                     key={groupKey}
                     id={isUnmapped ? 'group-unmapped-section' : undefined}
-                    className={`bg-white rounded-3xl border shadow-xs overflow-hidden transition-all duration-200 ${
+                    className={`bg-white rounded-3xl border shadow-xs transition-all duration-200 relative ${
                       isUnmapped 
                         ? 'border-2 border-amber-400 ring-2 ring-amber-200/60' 
                         : 'border-slate-200/90 hover:border-blue-300/80'
                     }`}
                   >
-                    {/* Header Group Accordion */}
+                    {/* Header Group Accordion (Sticky / Freeze saat scroll detail di bawahnya) */}
                     <div
                       onClick={() => toggleGroup(groupKey)}
-                      className={`p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4 cursor-pointer select-none transition-colors ${
-                        isUnmapped 
-                          ? (isExpanded ? 'bg-gradient-to-r from-amber-100 via-orange-50 to-white' : 'bg-amber-50/80 hover:bg-amber-100/70') 
-                          : (isExpanded ? 'bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white' : 'hover:bg-slate-50/70')
+                      className={`p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4 cursor-pointer select-none transition-all ${
+                        isExpanded 
+                          ? `${hideHeader ? 'sticky top-14' : 'sticky top-0'} z-20 backdrop-blur-md shadow-md rounded-t-3xl border-b border-slate-200/80 ` +
+                            (isUnmapped 
+                              ? 'bg-amber-50/95 ring-1 ring-amber-300' 
+                              : 'bg-white/95 ring-1 ring-blue-100')
+                          : (isUnmapped 
+                              ? 'rounded-3xl bg-amber-50/80 hover:bg-amber-100/70' 
+                              : 'rounded-3xl hover:bg-slate-50/70')
                       }`}
                     >
                       <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
@@ -1161,7 +1234,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                         }`}>
                           {isUnmapped ? '⚠️' : groupIdx + 1}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
                               isUnmapped 
@@ -1185,6 +1258,32 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           }`}>
                             {isUnmapped ? '⚠️ Kegiatan Belum Ada IKU (Tampungan Hasil Lepas / Hapus)' : group.ref_iku}
                           </h3>
+
+                          {/* REDAKSI URAIAN INDIKATOR TAHUN 2026 */}
+                          {groupUraian && (
+                            <div 
+                              onClick={(e) => e.stopPropagation()} 
+                              className="mt-2.5 p-2.5 sm:p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100/90 text-slate-700 text-[11px] leading-relaxed cursor-default select-text"
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">
+                                  <Info size={13} className="stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0 flex-1 space-y-0.5">
+                                  <span className="font-extrabold text-indigo-950 text-[10px] uppercase tracking-wider block">
+                                    Uraian Indikator (Ref 2026):
+                                  </span>
+                                  <p className="whitespace-pre-line text-slate-600 font-normal leading-relaxed">
+                                    {groupUraian.startsWith('-') ? (
+                                      <span className="italic text-slate-400">Belum ada penjelasan teknis tambahan ({groupUraian}).</span>
+                                    ) : (
+                                      groupUraian
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1217,7 +1316,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
                     {/* BODY TABEL DENGAN POIN 1, 3, 5, 6 */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 bg-white p-4 sm:p-5 space-y-3">
+                      <div className="border-t border-slate-100 bg-white p-4 sm:p-5 space-y-3 rounded-b-3xl">
                         {group.count === 0 ? (
                           <div className="py-8 text-center text-slate-400 text-xs">
                             Belum ada rincian kegiatan yang terpetakan ke referensi IKU ini.
