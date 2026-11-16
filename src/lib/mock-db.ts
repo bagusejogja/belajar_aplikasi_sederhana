@@ -26,6 +26,7 @@ export const mockUsers: User[] = [
 export const menuList: MenuItem[] = [
   // --- UTAMA ---
   { title: 'Dashboard Utama', path: '/', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Utama' },
+  { title: 'Latihan Soal (AI Quiz)', path: '/latihan-soal', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Utama' },
 
   // --- MASJID ---
   { title: 'Dashboard Masjid', path: '/dashboard', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
