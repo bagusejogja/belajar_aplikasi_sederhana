@@ -8,7 +8,7 @@ import {
   RefreshCw, FileSpreadsheet, ArrowLeft, Building2, HelpCircle,
   Trash2, ArrowRightLeft, AlertTriangle, RotateCcw,
   Check, X, Eye, EyeOff, PieChart as PieChartIcon, CheckSquare, Square,
-  Lock, Unlock, Info
+  Lock, Unlock, Info, Edit3, Pencil, Loader2
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import {
@@ -151,8 +151,54 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
   const [moveSearchText, setMoveSearchText] = useState<string>('');
   const movePopoverRef = useRef<HTMLDivElement>(null);
 
-  // Gembok / Penanda IKU Sudah Benar (Persisten Global via Supabase & Caching LocalStorage)
+  // Kunci / Penanda IKU Sudah Dipetakan (Persisten Global via Supabase & Caching LocalStorage)
   const [lockedItemIds, setLockedItemIds] = useState<Record<number, boolean>>({});
+
+  // Deteksi embedded iframe untuk kalkulasi sticky offset
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsEmbedded(window.self !== window.top || window.location.search.includes('embedded=1'));
+    }
+  }, []);
+
+  // State Ubah Uraian Indikator (Poin 2)
+  const [editingUraianKey, setEditingUraianKey] = useState<string | null>(null);
+  const [editUraianText, setEditUraianText] = useState<string>('');
+  const [isSavingUraian, setIsSavingUraian] = useState<boolean>(false);
+
+  const handleSaveUraian = async (refIku: string, tahun: number) => {
+    setIsSavingUraian(true);
+    try {
+      const res = await fetch('/api/iku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_uraian',
+          ref_iku: refIku,
+          tahun: tahun,
+          uraian: editUraianText
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`Uraian untuk "${refIku.slice(0, 30)}..." berhasil diperbarui.`, 'success');
+        setGroups(prev => prev.map(g => g.ref_iku === refIku ? { ...g, uraian: editUraianText } : g));
+        setMasters(prev => prev.map(m => m.nama_ref_iku === refIku ? { ...m, uraian: editUraianText } : m));
+        IKU_URAIAN_2026[refIku] = editUraianText;
+        setEditingUraianKey(null);
+      } else {
+        showToast(json.error || 'Gagal menyimpan uraian', 'error');
+      }
+    } catch (err) {
+      showToast('Gagal menghubungi server untuk update uraian', 'error');
+    } finally {
+      setIsSavingUraian(false);
+    }
+  };
+
+  // Sticky top offset: jika embedded di iframe gunakan top-0, jika di halaman publik/dashboard gunakan top-[54px]
+  const stickyTopClass = isEmbedded ? 'sticky top-0' : 'sticky top-[54px]';
 
   // Collapsible state untuk Baris 3, 4, 5 (Hirarki Tujuan, Sasaran, Program) - Default Tertutup Semua
   const [expandedHierarchyIds, setExpandedHierarchyIds] = useState<Record<number, boolean>>({});
@@ -186,7 +232,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     }, 5000);
   };
 
-  // Muat status gembok dari localStorage saat awal render untuk respon instan
+  // Muat status kunci dari localStorage saat awal render untuk respon instan
   useEffect(() => {
     try {
       const saved = localStorage.getItem('iku_locked_items_store') || localStorage.getItem('iku_checked_items_store');
@@ -194,11 +240,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
         setLockedItemIds(JSON.parse(saved));
       }
     } catch (e) {
-      console.warn('Gagal memuat status gembok dari storage:', e);
+      console.warn('Gagal memuat status kunci dari storage:', e);
     }
   }, []);
 
-  // Simpan & Toggle Gembok Kegiatan (IKU Sudah Benar) - Persisten Global
+  // Simpan & Toggle Kunci Kegiatan (IKU Sudah Dipetakan) - Persisten Global
   const toggleLockItem = async (id: number) => {
     const isNowLocked = !lockedItemIds[id];
     setLockedItemIds(prev => {
@@ -216,8 +262,8 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     showToast(
       isNowLocked 
-        ? `Kegiatan #${id} telah digembok (IKU Sudah Benar)` 
-        : `Gembok kegiatan #${id} telah dibuka`,
+        ? `Kegiatan #${id} telah dikunci (IKU Sudah Dipetakan & Terkunci)` 
+        : `Kunci kegiatan #${id} telah dibuka`,
       isNowLocked ? 'success' : 'info'
     );
 
@@ -231,11 +277,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
         })
       });
     } catch (err) {
-      console.error('Gagal sinkron status gembok ke server:', err);
+      console.error('Gagal sinkron status kunci ke server:', err);
     }
   };
 
-  // Gembok / Buka Gembok Massal (Batch) - Persisten Global
+  // Kunci / Buka Kunci Massal (Batch) - Persisten Global
   const batchLockItems = async (items: IkuItem[], lock: boolean) => {
     const targetIds = items.map(it => it.id);
     setLockedItemIds(prev => {
@@ -252,8 +298,8 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     showToast(
       lock 
-        ? `${targetIds.length} kegiatan di halaman ini berhasil digembok (IKU Sudah Benar)` 
-        : `Gembok ${targetIds.length} kegiatan di halaman ini berhasil dibuka`,
+        ? `${targetIds.length} kegiatan di halaman ini berhasil dikunci (IKU Sudah Dipetakan & Terkunci)` 
+        : `Kunci ${targetIds.length} kegiatan di halaman ini berhasil dibuka`,
       lock ? 'success' : 'info'
     );
 
@@ -478,7 +524,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
   }, [groups]);
   const unmappedCount = unmappedGroup ? unmappedGroup.count : 0;
 
-  // Total Gembok Items Counter
+  // Total Kunci Items Counter
   const totalLockedCount = useMemo(() => {
     return Object.values(lockedItemIds).filter(Boolean).length;
   }, [lockedItemIds]);
@@ -511,7 +557,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     sheet.columns = [
       { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Gembok', key: 'status_gembok', width: 16 },
+      { header: 'Status Kunci', key: 'status_kunci', width: 18 },
       { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
       { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
       { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
@@ -542,7 +588,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     group.items.forEach((item, idx) => {
       sheet.addRow({
         no: idx + 1,
-        status_gembok: lockedItemIds[item.id] ? 'Digembok (IKU Benar)' : 'Belum Digembok',
+        status_kunci: lockedItemIds[item.id] ? 'Terkunci (IKU Sudah Dipetakan)' : 'Belum Dikunci',
         ref_tahun_iku: item.ref_tahun_iku,
         ref_iku: item.ref_iku,
         tujuan_kode: item.tujuan_kode,
@@ -581,7 +627,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     sheet.columns = [
       { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Gembok', key: 'status_gembok', width: 16 },
+      { header: 'Status Kunci', key: 'status_kunci', width: 18 },
       { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
       { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
       { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
@@ -613,7 +659,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     allFlattenedItems.forEach(item => {
       sheet.addRow({
         no: counter++,
-        status_gembok: lockedItemIds[item.id] ? 'Digembok (IKU Benar)' : 'Belum Digembok',
+        status_kunci: lockedItemIds[item.id] ? 'Terkunci (IKU Sudah Dipetakan)' : 'Belum Dikunci',
         ref_tahun_iku: item.ref_tahun_iku,
         ref_iku: item.ref_iku,
         tujuan_kode: item.tujuan_kode,
@@ -763,7 +809,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
               </div>
               <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
                 <Lock size={12} className="text-emerald-700" />
-                <span>{totalLockedCount} kegiatan digembok (IKU Benar)</span>
+                <span>{totalLockedCount} kegiatan dikunci (IKU Sudah Dipetakan)</span>
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
@@ -800,7 +846,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
           </div>
         </div>
 
-        {/* POIN 1: GRAFIK PIE CHART (DEFAULT TERTUTUP, BISA DIBUKA LEWAT BANNER) */}
+        {/* POIN 4: GRAFIK PIE CHART 50% KIRI & KETERANGAN 50% KANAN */}
         {showChart && chartData.length > 0 && (
           <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-3 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -810,7 +856,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                   <span>Grafik Distribusi Jumlah Kegiatan per IKU (Tahun {selectedTahun === 'all' ? '2025 - 2026' : selectedTahun})</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Diagram proporsi kegiatan RKAT terhadap masing-masing IKU (Sort by Abjad). Klik potongan diagram untuk menyaring.
+                  Diagram proporsi kegiatan RKAT (separuh kiri) dan keterangan indikator lengkap (separuh kanan). Klik potongan atau keterangan untuk menyaring.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -828,67 +874,113 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
               </div>
             </div>
 
-            <div className="h-80 w-full flex items-center justify-center relative pt-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                      borderRadius: '1rem',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      maxWidth: '340px'
-                    }}
-                    formatter={(val: any, name: any, item: any) => [
-                      `${val} Kegiatan (${Math.round((Number(val) / (totalMatched || 1)) * 100)}%)`,
-                      item.payload.fullName
-                    ]}
-                  />
-                  <Pie
-                    data={chartData}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="48%"
-                    innerRadius={55}
-                    outerRadius={105}
-                    paddingAngle={2}
-                    animationDuration={600}
-                    onClick={(entry: any) => {
-                      const targetName = entry?.payload?.fullName || entry?.fullName;
-                      if (targetName) {
-                        setSelectedRef(targetName);
-                        setViewMode('grouped');
-                      }
-                    }}
-                    cursor="pointer"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-pie-${index}`} 
-                        fill={entry.fullName === 'Belum Ada IKU' ? '#f59e0b' : PIE_COLORS[index % PIE_COLORS.length]} 
-                      />
-                    ))}
-                  </Pie>
-                  <Legend
-                    verticalAlign="bottom"
-                    height={48}
-                    iconType="circle"
-                    iconSize={8}
-                    formatter={(value) => <span className="text-[10px] font-bold text-slate-600 mr-2">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            {/* Layout 2 Kolom: Kiri Setengah Halaman (Grafik), Kanan Setengah Halaman (Keterangan) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
+              {/* SISI KIRI: Setengah Halaman (lg:col-span-6) untuk Grafik Donut / Pie */}
+              <div className="lg:col-span-6 h-80 w-full flex items-center justify-center relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                        borderRadius: '1rem',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        maxWidth: '340px'
+                      }}
+                      formatter={(val: any, name: any, item: any) => [
+                        `${val} Kegiatan (${Math.round((Number(val) / (totalMatched || 1)) * 100)}%)`,
+                        item.payload.fullName
+                      ]}
+                    />
+                    <Pie
+                      data={chartData}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={115}
+                      paddingAngle={2}
+                      animationDuration={600}
+                      onClick={(entry: any) => {
+                        const targetName = entry?.payload?.fullName || entry?.fullName;
+                        if (targetName) {
+                          setSelectedRef(targetName);
+                          setViewMode('grouped');
+                        }
+                      }}
+                      cursor="pointer"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-pie-${index}`} 
+                          fill={entry.fullName === 'Belum Ada IKU' ? '#f59e0b' : PIE_COLORS[index % PIE_COLORS.length]} 
+                        />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
 
-              {/* Center Donut Info */}
-              <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                <div className="text-xl font-black text-slate-900 font-mono tracking-tight leading-none">
-                  {totalMatched}
+                {/* Center Donut Info */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                  <div className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
+                    {totalMatched}
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                    Total Kegiatan
+                  </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                  Total Kegiatan
+              </div>
+
+              {/* SISI KANAN: Setengah Halaman (lg:col-span-6) untuk Keterangan / Legend Interaktif */}
+              <div className="lg:col-span-6 bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    Keterangan Distribusi ({chartData.length} Indikator):
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Klik item untuk filter
+                  </span>
+                </div>
+                
+                <div className="overflow-y-auto max-h-64 pr-1 space-y-1.5 custom-scrollbar">
+                  {chartData.map((item, idx) => {
+                    const pct = Math.round((item.count / (totalMatched || 1)) * 100);
+                    const color = item.fullName === 'Belum Ada IKU' ? '#f59e0b' : PIE_COLORS[idx % PIE_COLORS.length];
+                    const isSelected = selectedRef === item.fullName;
+
+                    return (
+                      <div
+                        key={`legend-item-${idx}`}
+                        onClick={() => {
+                          setSelectedRef(item.fullName);
+                          setViewMode('grouped');
+                        }}
+                        className={`flex items-center justify-between gap-2 p-2 rounded-xl text-xs cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'bg-blue-100/90 border border-blue-300 font-black text-blue-900 shadow-2xs' 
+                            : 'bg-white hover:bg-slate-100/80 text-slate-700 border border-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span 
+                            className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border border-white" 
+                            style={{ backgroundColor: color }}
+                          />
+                          <span className="truncate font-semibold text-[11px]" title={item.fullName}>
+                            {item.fullName}
+                          </span>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                          <span className="text-slate-800">{item.count} keg.</span>
+                          <span className="text-slate-400 text-[10px]">({pct}%)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1215,7 +1307,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                       onClick={() => toggleGroup(groupKey)}
                       className={`p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4 cursor-pointer select-none transition-all ${
                         isExpanded 
-                          ? `${hideHeader ? 'sticky top-14' : 'sticky top-0'} z-20 backdrop-blur-md shadow-md rounded-t-3xl border-b border-slate-200/80 ` +
+                          ? `${stickyTopClass} z-20 backdrop-blur-md shadow-md rounded-t-3xl border-b border-slate-200/80 ` +
                             (isUnmapped 
                               ? 'bg-amber-50/95 ring-1 ring-amber-300' 
                               : 'bg-white/95 ring-1 ring-blue-100')
@@ -1259,7 +1351,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                             {isUnmapped ? '⚠️ Kegiatan Belum Ada IKU (Tampungan Hasil Lepas / Hapus)' : group.ref_iku}
                           </h3>
 
-                          {/* REDAKSI URAIAN INDIKATOR TAHUN 2026 */}
+                          {/* REDAKSI URAIAN INDIKATOR TAHUN 2026 + FITUR UBAH URAIAN (POIN 2) */}
                           {groupUraian && (
                             <div 
                               onClick={(e) => e.stopPropagation()} 
@@ -1269,17 +1361,66 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                 <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">
                                   <Info size={13} className="stroke-[2.5]" />
                                 </div>
-                                <div className="min-w-0 flex-1 space-y-0.5">
-                                  <span className="font-extrabold text-indigo-950 text-[10px] uppercase tracking-wider block">
-                                    Uraian Indikator (Ref 2026):
-                                  </span>
-                                  <p className="whitespace-pre-line text-slate-600 font-normal leading-relaxed">
-                                    {groupUraian.startsWith('-') ? (
-                                      <span className="italic text-slate-400">Belum ada penjelasan teknis tambahan ({groupUraian}).</span>
-                                    ) : (
-                                      groupUraian
-                                    )}
-                                  </p>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-extrabold text-indigo-950 text-[10px] uppercase tracking-wider block">
+                                      Uraian Indikator (Ref 2026):
+                                    </span>
+
+                                    {/* Tombol Ubah Uraian (Poin 2) */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingUraianKey(editingUraianKey === groupKey ? null : groupKey);
+                                        setEditUraianText(group.uraian || IKU_URAIAN_2026[group.ref_iku] || '');
+                                      }}
+                                      className="inline-flex items-center gap-1 text-[10px] text-indigo-700 hover:text-indigo-950 font-bold bg-white/90 hover:bg-white px-2 py-0.5 rounded-md border border-indigo-200 transition-all cursor-pointer shadow-2xs"
+                                      title="Klik untuk mengubah atau menyesuaikan teks uraian indikator ini"
+                                    >
+                                      <Edit3 size={11} />
+                                      <span>{editingUraianKey === groupKey ? 'Tutup Edit' : 'Ubah Uraian'}</span>
+                                    </button>
+                                  </div>
+
+                                  {/* Mode Edit Uraian */}
+                                  {editingUraianKey === groupKey ? (
+                                    <div className="mt-2 space-y-2 pt-1 border-t border-indigo-200/60">
+                                      <textarea
+                                        value={editUraianText}
+                                        onChange={(e) => setEditUraianText(e.target.value)}
+                                        rows={3}
+                                        className="w-full text-xs p-2.5 rounded-xl border border-indigo-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-normal leading-relaxed text-slate-800"
+                                        placeholder="Ketik uraian indikator baru di sini..."
+                                      />
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingUraianKey(null)}
+                                          className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                                        >
+                                          Batal
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isSavingUraian}
+                                          onClick={() => handleSaveUraian(group.ref_iku, group.ref_tahun_iku)}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all disabled:opacity-50"
+                                        >
+                                          {isSavingUraian && <Loader2 size={12} className="animate-spin" />}
+                                          <span>Simpan Perubahan</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="whitespace-pre-line text-slate-600 font-normal leading-relaxed">
+                                      {groupUraian.startsWith('-') ? (
+                                        <span className="italic text-slate-400">Belum ada penjelasan teknis tambahan ({groupUraian}).</span>
+                                      ) : (
+                                        groupUraian
+                                      )}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1323,35 +1464,12 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           </div>
                         ) : (
                           <>
-                            {/* Inner Pagination Header & Tombol Checklist Massal */}
+                            {/* Inner Pagination Header (Teks redundan 'Gembok Hal Ini' dihapus sesuai Poin 5) */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium text-slate-500 px-1 pb-1">
                               <div className="flex items-center gap-3">
                                 <span>
                                   Menampilkan {(currentInnerPage - 1) * innerPageSize + 1} - {Math.min(currentInnerPage * innerPageSize, group.items.length)} dari {group.items.length} kegiatan
                                 </span>
-
-                                {/* Quick Gembok / Buka Gembok Massal */}
-                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
-                                  <button
-                                    type="button"
-                                    onClick={() => batchLockItems(paginatedItems, true)}
-                                    className="text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1 cursor-pointer"
-                                    title="Gembok semua kegiatan di halaman ini (Tandai IKU Sudah Benar)"
-                                  >
-                                    <Lock size={12} className="text-emerald-600" />
-                                    <span>Gembok Hal Ini</span>
-                                  </button>
-                                  <span>•</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => batchLockItems(paginatedItems, false)}
-                                    className="text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-1 cursor-pointer"
-                                    title="Buka gembok kegiatan di halaman ini"
-                                  >
-                                    <Unlock size={12} className="text-slate-500" />
-                                    <span>Buka Gembok</span>
-                                  </button>
-                                </div>
                               </div>
 
                               {totalInnerPages > 1 && (
@@ -1383,7 +1501,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
                                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
-                                    {/* Kolom Gembok & No */}
+                                    {/* Kolom Kunci & No */}
                                     <th className="py-3 px-3 text-center w-14 select-none">
                                       <div className="flex flex-col items-center justify-center gap-0.5">
                                         <button
@@ -1399,8 +1517,8 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                           }`}
                                           title={
                                             paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
-                                              ? "Buka gembok semua kegiatan di halaman ini"
-                                              : "Gembok semua kegiatan di halaman ini (IKU Benar)"
+                                              ? "Buka kunci semua kegiatan di halaman ini"
+                                              : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
                                           }
                                         >
                                           {paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]) ? (
@@ -1415,10 +1533,10 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                       </div>
                                     </th>
 
-                                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) di Kiri Judul "Rincian RKAT & Aksi Pemetaan IKU" */}
+                                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) + Judul + Tombol Kunci Halaman Ini di Samping Judul (Poin 5) */}
                                     <th className="py-3 px-4">
                                       <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2.5">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
                                           {/* Tombol Buka/Tutup Semua Hirarki di Kiri Judul */}
                                           <button
                                             type="button"
@@ -1448,6 +1566,37 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                           <span className="font-black text-slate-800">
                                             Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
                                           </span>
+
+                                          {/* Tombol Kunci Halaman Ini di samping Judul (Poin 5) */}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const allLocked = paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]);
+                                              batchLockItems(paginatedItems, !allLocked);
+                                            }}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
+                                              paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
+                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                                                : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-300 shadow-2xs'
+                                            }`}
+                                            title={
+                                              paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
+                                                ? "Buka kunci semua kegiatan di halaman ini"
+                                                : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
+                                            }
+                                          >
+                                            {paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]) ? (
+                                              <>
+                                                <Lock size={12} className="text-white stroke-[2.5]" />
+                                                <span>Buka Kunci Halaman Ini</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Lock size={12} className="text-emerald-600 stroke-[2.5]" />
+                                                <span>Kunci Halaman Ini</span>
+                                              </>
+                                            )}
+                                          </button>
                                         </div>
 
                                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
@@ -1473,7 +1622,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                             : 'hover:bg-blue-50/30'
                                         }`}
                                       >
-                                        {/* Kolom Gembok & No */}
+                                        {/* Kolom Kunci & No */}
                                         <td className="py-3.5 px-3 text-center align-top space-y-1.5 w-14">
                                           <button
                                             type="button"
@@ -1483,7 +1632,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                                 ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs hover:bg-emerald-700 ring-2 ring-emerald-300/60'
                                                 : 'bg-white hover:bg-slate-100 text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400 shadow-2xs'
                                             }`}
-                                            title={isLocked ? "IKU Sudah Benar (Terkunci). Klik untuk buka gembok" : "Klik untuk gembok (IKU Sudah Benar)"}
+                                            title={isLocked ? "IKU Sudah Dipetakan & Terkunci. Klik untuk buka kunci" : "Klik untuk kunci (IKU Sudah Dipetakan & Terkunci)"}
                                           >
                                             {isLocked ? (
                                               <Lock size={15} className="stroke-[2.5]" />
@@ -1496,7 +1645,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                           </span>
                                           {isLocked && (
                                             <span className="inline-block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 leading-none">
-                                              GEMBOK
+                                              KUNCI
                                             </span>
                                           )}
                                         </td>
@@ -1657,15 +1806,15 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                               )}
                                             </div>
 
-                                            {/* Sisi Kanan: Status Gembok / IKU Sudah Benar */}
+                                            {/* Sisi Kanan: Status Kunci / IKU Sudah Dipetakan & Terkunci */}
                                             {isLocked ? (
                                               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-xl shadow-2xs">
                                                 <Lock size={12} className="text-emerald-700" />
-                                                <span>IKU Sudah Benar &amp; Terkunci</span>
+                                                <span>IKU Sudah Dipetakan &amp; Terkunci</span>
                                               </div>
                                             ) : (
                                               <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
-                                                Belum digembok
+                                                Belum dikunci
                                               </span>
                                             )}
                                           </div>
@@ -1847,7 +1996,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
-                    {/* Kolom Gembok & No */}
+                    {/* Kolom Kunci & No */}
                     <th className="py-3 px-3 text-center w-14 select-none">
                       <div className="flex flex-col items-center justify-center gap-0.5">
                         <button
@@ -1863,8 +2012,8 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           }`}
                           title={
                             paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
-                              ? "Buka gembok semua kegiatan di halaman ini"
-                              : "Gembok semua kegiatan di halaman ini (IKU Benar)"
+                              ? "Buka kunci semua kegiatan di halaman ini"
+                              : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
                           }
                         >
                           {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]) ? (
@@ -1879,10 +2028,10 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                       </div>
                     </th>
 
-                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) di Kiri Judul "Rincian RKAT & Aksi Pemetaan IKU" */}
+                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) + Judul + Tombol Kunci Halaman Ini */}
                     <th className="py-3 px-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 flex-wrap">
                           {/* Tombol Buka/Tutup Semua Hirarki di Kiri Judul */}
                           <button
                             type="button"
@@ -1912,6 +2061,37 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           <span className="font-black text-slate-800">
                             Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
                           </span>
+
+                          {/* Tombol Kunci Halaman Ini di samping Judul (Poin 5) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allLocked = paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]);
+                              batchLockItems(paginatedTableItems, !allLocked);
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
+                              paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
+                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                                : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-300 shadow-2xs'
+                            }`}
+                            title={
+                              paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
+                                ? "Buka kunci semua kegiatan di halaman ini"
+                                : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
+                            }
+                          >
+                            {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]) ? (
+                              <>
+                                <Lock size={12} className="text-white stroke-[2.5]" />
+                                <span>Buka Kunci Halaman Ini</span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock size={12} className="text-emerald-600 stroke-[2.5]" />
+                                <span>Kunci Halaman Ini</span>
+                              </>
+                            )}
+                          </button>
                         </div>
 
                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
@@ -1937,7 +2117,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                             : 'hover:bg-blue-50/30'
                         }`}
                       >
-                        {/* Kolom Gembok & No */}
+                        {/* Kolom Kunci & No */}
                         <td className="py-3.5 px-3 text-center align-top space-y-1.5 w-14">
                           <button
                             type="button"
@@ -1947,7 +2127,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                 ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs hover:bg-emerald-700 ring-2 ring-emerald-300/60'
                                 : 'bg-white hover:bg-slate-100 text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400 shadow-2xs'
                             }`}
-                            title={isLocked ? "IKU Sudah Benar (Terkunci). Klik untuk buka gembok" : "Klik untuk gembok (IKU Sudah Benar)"}
+                            title={isLocked ? "IKU Sudah Dipetakan & Terkunci. Klik untuk buka kunci" : "Klik untuk kunci (IKU Sudah Dipetakan & Terkunci)"}
                           >
                             {isLocked ? (
                               <Lock size={15} className="stroke-[2.5]" />
@@ -1960,7 +2140,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           </span>
                           {isLocked && (
                             <span className="inline-block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 leading-none">
-                              GEMBOK
+                              KUNCI
                             </span>
                           )}
                         </td>
@@ -2129,15 +2309,15 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                               )}
                             </div>
 
-                            {/* Sisi Kanan: Status Gembok / IKU Sudah Benar */}
+                            {/* Sisi Kanan: Status Kunci / IKU Sudah Dipetakan & Terkunci */}
                             {isLocked ? (
                               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-xl shadow-2xs">
                                 <Lock size={12} className="text-emerald-700" />
-                                <span>IKU Sudah Benar &amp; Terkunci</span>
+                                <span>IKU Sudah Dipetakan &amp; Terkunci</span>
                               </div>
                             ) : (
                               <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
-                                Belum digembok
+                                Belum dikunci
                               </span>
                             )}
                           </div>

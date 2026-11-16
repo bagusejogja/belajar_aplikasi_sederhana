@@ -250,7 +250,7 @@ export async function GET(req: NextRequest) {
         return a.ref_iku.localeCompare(b.ref_iku, undefined, { numeric: true, sensitivity: 'base' });
       });
 
-    // Ambil daftar ID kegiatan yang terkunci (Gembok / IKU Benar) dari Supabase agar persisten lintas perangkat
+    // Ambil daftar ID kegiatan yang terkunci (Kunci / IKU Sudah Dipetakan) dari Supabase agar persisten lintas perangkat
     let lockedIds: number[] = [];
     try {
       const { data: lockRows } = await supabase
@@ -262,6 +262,28 @@ export async function GET(req: NextRequest) {
       }
     } catch (lockErr) {
       console.warn('Gagal memuat lockedIds dari Supabase:', lockErr);
+    }
+
+    // Ambil custom uraian IKU jika pernah diubah oleh pengguna
+    try {
+      const { data: uraianRows } = await supabase
+        .from('app_user_favorites')
+        .select('path, title')
+        .eq('user_id', 'global_iku_uraian');
+      if (uraianRows && uraianRows.length > 0) {
+        uraianRows.forEach((r: any) => {
+          const ikuName = r.path;
+          const customUraian = r.title;
+          if (ikuName && customUraian !== undefined) {
+            const m = filteredMasters.find(x => x.nama_ref_iku === ikuName);
+            if (m) m.uraian = customUraian;
+            const g = groupedList.find(x => x.ref_iku === ikuName);
+            if (g) g.uraian = customUraian;
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Gagal memuat custom uraian dari Supabase:', e);
     }
 
     return NextResponse.json({
@@ -372,7 +394,38 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Aksi Pindah IKU atau Lepas/Hapus
+    // 5. Aksi Ubah Uraian Indikator IKU
+    if (action === 'update_uraian') {
+      const { ref_iku, uraian } = body;
+      if (!ref_iku) {
+        return NextResponse.json({ success: false, error: 'Nama referensi IKU wajib diisi' }, { status: 400 });
+      }
+
+      const ikuData = loadIkuData();
+      const master = ikuData?.masterReferences?.find(m => m.nama_ref_iku === ref_iku);
+      if (master && ikuData) {
+        master.uraian = uraian || '';
+        saveIkuData(ikuData);
+      }
+
+      // Simpan juga ke Supabase app_user_favorites agar persisten global di cloud
+      try {
+        await supabase.from('app_user_favorites').upsert(
+          [{ user_id: 'global_iku_uraian', path: ref_iku, title: uraian || '' }],
+          { onConflict: 'user_id,path' }
+        );
+      } catch (err) {
+        console.warn('Gagal simpan custom uraian ke Supabase:', err);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Uraian indikator berhasil diperbarui`,
+        data: { ref_iku, uraian }
+      });
+    }
+
+    // 6. Aksi Pindah IKU atau Lepas/Hapus
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
     }
