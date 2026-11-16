@@ -7,7 +7,8 @@ import {
   Layers, CheckCircle2, Award, BookOpen, ExternalLink,
   RefreshCw, FileSpreadsheet, ArrowLeft, Building2, HelpCircle,
   Trash2, ArrowRightLeft, AlertTriangle, RotateCcw,
-  Check, X, Eye, EyeOff, PieChart as PieChartIcon, CheckSquare, Square
+  Check, X, Eye, EyeOff, PieChart as PieChartIcon, CheckSquare, Square,
+  Lock, Unlock
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import {
@@ -92,8 +93,8 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
   const [moveSearchText, setMoveSearchText] = useState<string>('');
   const movePopoverRef = useRef<HTMLDivElement>(null);
 
-  // POIN 6: Checkbox penanda kegiatan sudah dicek (disimpan di localStorage)
-  const [checkedItemIds, setCheckedItemIds] = useState<Record<number, boolean>>({});
+  // Gembok / Penanda IKU Sudah Benar (Persisten Global via Supabase & Caching LocalStorage)
+  const [lockedItemIds, setLockedItemIds] = useState<Record<number, boolean>>({});
 
   // Collapsible state untuk Baris 3, 4, 5 (Hirarki Tujuan, Sasaran, Program) - Default Tertutup Semua
   const [expandedHierarchyIds, setExpandedHierarchyIds] = useState<Record<number, boolean>>({});
@@ -127,45 +128,89 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     }, 5000);
   };
 
-  // Muat status centang dari localStorage saat pertama kali load
+  // Muat status gembok dari localStorage saat awal render untuk respon instan
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('iku_checked_items_store');
+      const saved = localStorage.getItem('iku_locked_items_store') || localStorage.getItem('iku_checked_items_store');
       if (saved) {
-        setCheckedItemIds(JSON.parse(saved));
+        setLockedItemIds(JSON.parse(saved));
       }
     } catch (e) {
-      console.warn('Gagal memuat status centang dari storage:', e);
+      console.warn('Gagal memuat status gembok dari storage:', e);
     }
   }, []);
 
-  // Simpan status centang ke localStorage
-  const toggleCheckItem = (id: number) => {
-    setCheckedItemIds(prev => {
-      const next = { ...prev, [id]: !prev[id] };
-      try {
-        localStorage.setItem('iku_checked_items_store', JSON.stringify(next));
-      } catch (e) {
-        console.warn('Gagal menyimpan centang ke storage:', e);
+  // Simpan & Toggle Gembok Kegiatan (IKU Sudah Benar) - Persisten Global
+  const toggleLockItem = async (id: number) => {
+    const isNowLocked = !lockedItemIds[id];
+    setLockedItemIds(prev => {
+      const next = { ...prev };
+      if (isNowLocked) {
+        next[id] = true;
+      } else {
+        delete next[id];
       }
+      try {
+        localStorage.setItem('iku_locked_items_store', JSON.stringify(next));
+      } catch (e) {}
       return next;
     });
+
+    showToast(
+      isNowLocked 
+        ? `Kegiatan #${id} telah digembok (IKU Sudah Benar)` 
+        : `Gembok kegiatan #${id} telah dibuka`,
+      isNowLocked ? 'success' : 'info'
+    );
+
+    try {
+      await fetch('/api/iku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isNowLocked ? 'lock' : 'unlock',
+          id: id
+        })
+      });
+    } catch (err) {
+      console.error('Gagal sinkron status gembok ke server:', err);
+    }
   };
 
-  const checkAllItemsInGroup = (items: IkuItem[], check: boolean) => {
-    setCheckedItemIds(prev => {
+  // Gembok / Buka Gembok Massal (Batch) - Persisten Global
+  const batchLockItems = async (items: IkuItem[], lock: boolean) => {
+    const targetIds = items.map(it => it.id);
+    setLockedItemIds(prev => {
       const next = { ...prev };
-      items.forEach(it => {
-        if (check) next[it.id] = true;
-        else delete next[it.id];
+      targetIds.forEach(id => {
+        if (lock) next[id] = true;
+        else delete next[id];
       });
       try {
-        localStorage.setItem('iku_checked_items_store', JSON.stringify(next));
-      } catch (e) {
-        console.warn('Gagal menyimpan centang ke storage:', e);
-      }
+        localStorage.setItem('iku_locked_items_store', JSON.stringify(next));
+      } catch (e) {}
       return next;
     });
+
+    showToast(
+      lock 
+        ? `${targetIds.length} kegiatan di halaman ini berhasil digembok (IKU Sudah Benar)` 
+        : `Gembok ${targetIds.length} kegiatan di halaman ini berhasil dibuka`,
+      lock ? 'success' : 'info'
+    );
+
+    try {
+      await fetch('/api/iku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: lock ? 'batch_lock' : 'batch_unlock',
+          ids: targetIds
+        })
+      });
+    } catch (err) {
+      console.error('Gagal sinkron batch lock ke server:', err);
+    }
   };
 
   // Close comboboxes when clicking outside
@@ -198,6 +243,18 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
         setGroups(fetchedGroups);
         setMasters(json.masters || []);
         setTotalMatched(json.totalMatchedRows || 0);
+
+        // Sinkronisasi status gembok dari server
+        if (json.lockedIds && Array.isArray(json.lockedIds)) {
+          const serverLocks: Record<number, boolean> = {};
+          json.lockedIds.forEach((id: number) => {
+            serverLocks[id] = true;
+          });
+          setLockedItemIds(serverLocks);
+          try {
+            localStorage.setItem('iku_locked_items_store', JSON.stringify(serverLocks));
+          } catch (e) {}
+        }
 
         // POIN 2: Default tertutup semua saja saat fetch data
         setExpandedGroups({});
@@ -363,10 +420,10 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
   }, [groups]);
   const unmappedCount = unmappedGroup ? unmappedGroup.count : 0;
 
-  // Total Checked Items Counter
-  const totalCheckedCount = useMemo(() => {
-    return Object.values(checkedItemIds).filter(Boolean).length;
-  }, [checkedItemIds]);
+  // Total Gembok Items Counter
+  const totalLockedCount = useMemo(() => {
+    return Object.values(lockedItemIds).filter(Boolean).length;
+  }, [lockedItemIds]);
 
   // POIN 4: Filter options combobox diurutkan alfabetis (Sort by Abjad)
   const filteredComboboxMasters = useMemo(() => {
@@ -396,7 +453,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     sheet.columns = [
       { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Cek', key: 'status_cek', width: 14 },
+      { header: 'Status Gembok', key: 'status_gembok', width: 16 },
       { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
       { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
       { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
@@ -427,7 +484,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     group.items.forEach((item, idx) => {
       sheet.addRow({
         no: idx + 1,
-        status_cek: checkedItemIds[item.id] ? 'Sudah Dicek' : 'Belum Dicek',
+        status_gembok: lockedItemIds[item.id] ? 'Digembok (IKU Benar)' : 'Belum Digembok',
         ref_tahun_iku: item.ref_tahun_iku,
         ref_iku: item.ref_iku,
         tujuan_kode: item.tujuan_kode,
@@ -466,7 +523,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
 
     sheet.columns = [
       { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Cek', key: 'status_cek', width: 14 },
+      { header: 'Status Gembok', key: 'status_gembok', width: 16 },
       { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
       { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
       { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
@@ -498,7 +555,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     allFlattenedItems.forEach(item => {
       sheet.addRow({
         no: counter++,
-        status_cek: checkedItemIds[item.id] ? 'Sudah Dicek' : 'Belum Dicek',
+        status_gembok: lockedItemIds[item.id] ? 'Digembok (IKU Benar)' : 'Belum Digembok',
         ref_tahun_iku: item.ref_tahun_iku,
         ref_iku: item.ref_iku,
         tujuan_kode: item.tujuan_kode,
@@ -646,8 +703,9 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
               <div className="text-xl font-black text-emerald-900 font-mono">
                 {totalMatched.toLocaleString('id-ID')} <span className="text-xs font-bold text-slate-400 font-sans">Baris</span>
               </div>
-              <span className="text-[11px] font-bold text-emerald-600">
-                {totalCheckedCount} kegiatan sudah dicek
+              <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                <Lock size={12} className="text-emerald-700" />
+                <span>{totalLockedCount} kegiatan digembok (IKU Benar)</span>
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
@@ -1173,45 +1231,26 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                   Menampilkan {(currentInnerPage - 1) * innerPageSize + 1} - {Math.min(currentInnerPage * innerPageSize, group.items.length)} dari {group.items.length} kegiatan
                                 </span>
 
-                                {/* POIN 6: Quick Check / Uncheck All Page & Toggle Hirarki */}
+                                {/* Quick Gembok / Buka Gembok Massal */}
                                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
                                   <button
                                     type="button"
-                                    onClick={() => checkAllItemsInGroup(paginatedItems, true)}
-                                    className="text-emerald-700 hover:underline flex items-center gap-1"
-                                    title="Tandai semua kegiatan di halaman ini sebagai sudah dicek"
+                                    onClick={() => batchLockItems(paginatedItems, true)}
+                                    className="text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1 cursor-pointer"
+                                    title="Gembok semua kegiatan di halaman ini (Tandai IKU Sudah Benar)"
                                   >
-                                    <CheckSquare size={13} />
-                                    <span>Centang Hal Ini</span>
+                                    <Lock size={12} className="text-emerald-600" />
+                                    <span>Gembok Hal Ini</span>
                                   </button>
                                   <span>•</span>
                                   <button
                                     type="button"
-                                    onClick={() => checkAllItemsInGroup(paginatedItems, false)}
-                                    className="text-slate-500 hover:underline"
-                                    title="Batal centang kegiatan di halaman ini"
+                                    onClick={() => batchLockItems(paginatedItems, false)}
+                                    className="text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                    title="Buka gembok kegiatan di halaman ini"
                                   >
-                                    Batal Centang
-                                  </button>
-                                  <span>•</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleAllHierarchyInGroup(paginatedItems, true)}
-                                    className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-0.5"
-                                    title="Buka seluruh rincian hirarki (Tujuan, Sasaran, Program) pada halaman ini"
-                                  >
-                                    <ChevronDown size={12} />
-                                    <span>Buka Semua Hirarki</span>
-                                  </button>
-                                  <span>/</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleAllHierarchyInGroup(paginatedItems, false)}
-                                    className="text-slate-500 hover:text-slate-700 hover:underline flex items-center gap-0.5"
-                                    title="Tutup seluruh rincian hirarki pada halaman ini"
-                                  >
-                                    <ChevronUp size={12} />
-                                    <span>Tutup Semua</span>
+                                    <Unlock size={12} className="text-slate-500" />
+                                    <span>Buka Gembok</span>
                                   </button>
                                 </div>
                               </div>
@@ -1245,38 +1284,75 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
                                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
-                                    {/* Kolom Cek & No */}
+                                    {/* Kolom Gembok & No */}
                                     <th className="py-3 px-3 text-center w-14 select-none">
                                       <div className="flex flex-col items-center justify-center gap-0.5">
-                                        <input
-                                          type="checkbox"
-                                          title={
-                                            paginatedItems.length > 0 && paginatedItems.every(it => !!checkedItemIds[it.id])
-                                              ? "Batalkan centang semua di halaman ini"
-                                              : "Centang semua kegiatan di halaman ini"
-                                          }
-                                          checked={paginatedItems.length > 0 && paginatedItems.every(it => !!checkedItemIds[it.id])}
-                                          onChange={(e) => {
-                                            checkAllItemsInGroup(paginatedItems, e.target.checked);
-                                            showToast(
-                                              e.target.checked 
-                                                ? `${paginatedItems.length} kegiatan di halaman ini berhasil dicentang` 
-                                                : `Centang ${paginatedItems.length} kegiatan di halaman ini dibatalkan`,
-                                              'info'
-                                            );
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const allLocked = paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]);
+                                            batchLockItems(paginatedItems, !allLocked);
                                           }}
-                                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                                        />
-                                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">SEMUA</span>
+                                          className={`p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
+                                            paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
+                                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                                              : 'bg-white text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400'
+                                          }`}
+                                          title={
+                                            paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
+                                              ? "Buka gembok semua kegiatan di halaman ini"
+                                              : "Gembok semua kegiatan di halaman ini (IKU Benar)"
+                                          }
+                                        >
+                                          {paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]) ? (
+                                            <Lock size={14} className="stroke-[2.5]" />
+                                          ) : (
+                                            <Unlock size={14} className="stroke-[2]" />
+                                          )}
+                                        </button>
+                                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">
+                                          {paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]) ? 'TERKUNCI' : 'SEMUA'}
+                                        </span>
                                       </div>
                                     </th>
 
-                                    {/* Kolom Terstruktur: Baris 1: Kegiatan RKAT, Baris 2: Pindah IKU / Aksi, Baris 3-5: Hirarki */}
+                                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) di Kiri Judul "Rincian RKAT & Aksi Pemetaan IKU" */}
                                     <th className="py-3 px-4">
                                       <div className="flex items-center justify-between">
-                                        <span>Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU</span>
+                                        <div className="flex items-center gap-2.5">
+                                          {/* Tombol Buka/Tutup Semua Hirarki di Kiri Judul */}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const allOpen = paginatedItems.length > 0 && paginatedItems.every(it => !!expandedHierarchyIds[it.id]);
+                                              toggleAllHierarchyInGroup(paginatedItems, !allOpen);
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-indigo-50 active:scale-95 text-indigo-700 border border-indigo-200 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                            title={
+                                              paginatedItems.length > 0 && paginatedItems.every(it => !!expandedHierarchyIds[it.id])
+                                                ? "Tutup Seluruh Hirarki Halaman Ini"
+                                                : "Buka Seluruh Hirarki Halaman Ini (Tujuan, Sasaran, Program)"
+                                            }
+                                          >
+                                            {paginatedItems.length > 0 && paginatedItems.every(it => !!expandedHierarchyIds[it.id]) ? (
+                                              <ChevronUp size={14} className="text-indigo-600 stroke-[3]" />
+                                            ) : (
+                                              <ChevronDown size={14} className="text-indigo-600 stroke-[3]" />
+                                            )}
+                                            <span className="font-extrabold text-[11px]">
+                                              {paginatedItems.length > 0 && paginatedItems.every(it => !!expandedHierarchyIds[it.id])
+                                                ? "Tutup Semua"
+                                                : "Buka Semua Hirarki"}
+                                            </span>
+                                          </button>
+
+                                          <span className="font-black text-slate-800">
+                                            Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
+                                          </span>
+                                        </div>
+
                                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
-                                          (Baris 1: Kegiatan RKAT • Baris 2: Pindah IKU / Aksi • Baris 3–5: Hirarki Indikator)
+                                          (Baris 1: Kegiatan RKAT • Baris 2: Hirarki &amp; Pindah IKU • Baris 3–5: Hirarki Indikator)
                                         </span>
                                       </div>
                                     </th>
@@ -1285,7 +1361,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                 <tbody className="divide-y divide-slate-100 font-medium">
                                   {paginatedItems.map((it, itemIdx) => {
                                     const isUpdatingThis = isUpdatingId === it.id;
-                                    const isChecked = !!checkedItemIds[it.id];
+                                    const isLocked = !!lockedItemIds[it.id];
                                     const isHierarchyOpen = !!expandedHierarchyIds[it.id];
                                     const itemNo = (currentInnerPage - 1) * innerPageSize + itemIdx + 1;
 
@@ -1293,26 +1369,35 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                       <tr 
                                         key={`${it.id}_${itemIdx}`} 
                                         className={`transition-colors ${
-                                          isChecked 
+                                          isLocked 
                                             ? 'bg-emerald-50/90 hover:bg-emerald-100/70 border-l-4 border-l-emerald-600' 
                                             : 'hover:bg-blue-50/30'
                                         }`}
                                       >
-                                        {/* Kolom Checkbox & No */}
+                                        {/* Kolom Gembok & No */}
                                         <td className="py-3.5 px-3 text-center align-top space-y-1.5 w-14">
-                                          <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={() => toggleCheckItem(it.id)}
-                                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                                            title={isChecked ? 'Telah ditandai sudah dicek (Klik untuk batal)' : 'Klik untuk menandai sudah dicek'}
-                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleLockItem(it.id)}
+                                            className={`w-7 h-7 mx-auto rounded-xl flex items-center justify-center transition-all cursor-pointer border active:scale-90 ${
+                                              isLocked
+                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs hover:bg-emerald-700 ring-2 ring-emerald-300/60'
+                                                : 'bg-white hover:bg-slate-100 text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400 shadow-2xs'
+                                            }`}
+                                            title={isLocked ? "IKU Sudah Benar (Terkunci). Klik untuk buka gembok" : "Klik untuk gembok (IKU Sudah Benar)"}
+                                          >
+                                            {isLocked ? (
+                                              <Lock size={15} className="stroke-[2.5]" />
+                                            ) : (
+                                              <Unlock size={14} className="stroke-[2]" />
+                                            )}
+                                          </button>
                                           <span className="block text-[10px] font-mono font-bold text-slate-400">
                                             #{itemNo}
                                           </span>
-                                          {isChecked && (
-                                            <span className="block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 rounded px-1 py-0.2">
-                                              DICEK
+                                          {isLocked && (
+                                            <span className="inline-block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 leading-none">
+                                              GEMBOK
                                             </span>
                                           )}
                                         </td>
@@ -1337,13 +1422,32 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                             </div>
                                           </div>
 
-                                          {/* BARIS 2. Pindah Antar IKU / Aksi & Tombol Toggle Hirarki */}
+                                          {/* BARIS 2. Aksi: Tombol Hirarki (Icon V) di Kiri Tombol Pindah IKU & Lepas IKU */}
                                           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                                             
-                                            {/* Sisi Kiri: Aksi Pindah IKU & Lepas */}
+                                            {/* Sisi Kiri: Tombol Hirarki (Icon V) + Pindah IKU + Lepas */}
                                             <div className="flex flex-wrap items-center gap-2 relative">
                                               
-                                              {/* Searchable Autocomplete Combobox Popover */}
+                                              {/* Tombol Lihat Hirarki berupa Icon V di sebelah kiri tombol Pindah ke IKU Lain */}
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleItemHierarchy(it.id)}
+                                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+                                                  isHierarchyOpen
+                                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-200'
+                                                    : 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border-indigo-200 hover:border-indigo-300 shadow-2xs'
+                                                }`}
+                                                title={isHierarchyOpen ? "Tutup Hirarki (Tujuan, Sasaran, Program)" : "Lihat Hirarki (Tujuan, Sasaran, Program)"}
+                                              >
+                                                {isHierarchyOpen ? (
+                                                  <ChevronUp size={14} className="stroke-[2.5]" />
+                                                ) : (
+                                                  <ChevronDown size={14} className="stroke-[2.5]" />
+                                                )}
+                                                <span className="font-extrabold">{isHierarchyOpen ? 'Tutup Hirarki' : 'Lihat Hirarki'}</span>
+                                              </button>
+
+                                              {/* Searchable Autocomplete Combobox Popover Pindah IKU */}
                                               <div className="relative">
                                                 <button
                                                   type="button"
@@ -1454,21 +1558,17 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                               )}
                                             </div>
 
-                                            {/* Sisi Kanan: Tombol Buka/Tutup Hirarki Baris 3, 4, 5 */}
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleItemHierarchy(it.id)}
-                                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                                                isHierarchyOpen
-                                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-300 shadow-2xs'
-                                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                                              }`}
-                                              title="Tampilkan / Sembunyikan Tujuan, Sasaran, & Program"
-                                            >
-                                              <Layers size={13} className={isHierarchyOpen ? "text-indigo-600" : "text-slate-500"} />
-                                              <span>{isHierarchyOpen ? 'Tutup Hirarki' : 'Lihat Hirarki (Tujuan, Sasaran, Program)'}</span>
-                                              <ChevronDown size={13} className={`transition-transform duration-200 ${isHierarchyOpen ? 'rotate-180 text-indigo-600' : 'text-slate-400'}`} />
-                                            </button>
+                                            {/* Sisi Kanan: Status Gembok / IKU Sudah Benar */}
+                                            {isLocked ? (
+                                              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-xl shadow-2xs">
+                                                <Lock size={12} className="text-emerald-700" />
+                                                <span>IKU Sudah Benar &amp; Terkunci</span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                                                Belum digembok
+                                              </span>
+                                            )}
                                           </div>
 
                                           {/* BARIS 3, 4, 5. Hirarki Tujuan, Sasaran, dan Program (Collapsible - Default Tertutup) */}
@@ -1648,35 +1748,75 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
+                    {/* Kolom Gembok & No */}
                     <th className="py-3 px-3 text-center w-14 select-none">
                       <div className="flex flex-col items-center justify-center gap-0.5">
-                        <input
-                          type="checkbox"
-                          title={
-                            paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!checkedItemIds[it.id])
-                              ? "Batalkan centang semua di halaman ini"
-                              : "Centang semua kegiatan di halaman ini"
-                          }
-                          checked={paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!checkedItemIds[it.id])}
-                          onChange={(e) => {
-                            checkAllItemsInGroup(paginatedTableItems, e.target.checked);
-                            showToast(
-                              e.target.checked 
-                                ? `${paginatedTableItems.length} kegiatan di halaman ini berhasil dicentang` 
-                                : `Centang ${paginatedTableItems.length} kegiatan di halaman ini dibatalkan`,
-                              'info'
-                            );
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allLocked = paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]);
+                            batchLockItems(paginatedTableItems, !allLocked);
                           }}
-                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                        />
-                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">SEMUA</span>
+                          className={`p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
+                            paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
+                              : 'bg-white text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400'
+                          }`}
+                          title={
+                            paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
+                              ? "Buka gembok semua kegiatan di halaman ini"
+                              : "Gembok semua kegiatan di halaman ini (IKU Benar)"
+                          }
+                        >
+                          {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]) ? (
+                            <Lock size={14} className="stroke-[2.5]" />
+                          ) : (
+                            <Unlock size={14} className="stroke-[2]" />
+                          )}
+                        </button>
+                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">
+                          {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]) ? 'TERKUNCI' : 'SEMUA'}
+                        </span>
                       </div>
                     </th>
+
+                    {/* Kolom Terstruktur: Tombol Hirarki (Icon V) di Kiri Judul "Rincian RKAT & Aksi Pemetaan IKU" */}
                     <th className="py-3 px-4">
                       <div className="flex items-center justify-between">
-                        <span>Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU</span>
+                        <div className="flex items-center gap-2.5">
+                          {/* Tombol Buka/Tutup Semua Hirarki di Kiri Judul */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allOpen = paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!expandedHierarchyIds[it.id]);
+                              toggleAllHierarchyInGroup(paginatedTableItems, !allOpen);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-indigo-50 active:scale-95 text-indigo-700 border border-indigo-200 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                            title={
+                              paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!expandedHierarchyIds[it.id])
+                                ? "Tutup Seluruh Hirarki Halaman Ini"
+                                : "Buka Seluruh Hirarki Halaman Ini (Tujuan, Sasaran, Program)"
+                            }
+                          >
+                            {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!expandedHierarchyIds[it.id]) ? (
+                              <ChevronUp size={14} className="text-indigo-600 stroke-[3]" />
+                            ) : (
+                              <ChevronDown size={14} className="text-indigo-600 stroke-[3]" />
+                            )}
+                            <span className="font-extrabold text-[11px]">
+                              {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!expandedHierarchyIds[it.id])
+                                ? "Tutup Semua"
+                                : "Buka Semua Hirarki"}
+                            </span>
+                          </button>
+
+                          <span className="font-black text-slate-800">
+                            Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
+                          </span>
+                        </div>
+
                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
-                          (Baris 1: Kegiatan RKAT &amp; IKU • Baris 2: Pindah IKU / Aksi • Baris 3–5: Hirarki Indikator)
+                          (Baris 1: Kegiatan RKAT &amp; IKU • Baris 2: Hirarki &amp; Pindah IKU • Baris 3–5: Hirarki Indikator)
                         </span>
                       </div>
                     </th>
@@ -1684,7 +1824,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {paginatedTableItems.map((it, idx) => {
-                    const isChecked = !!checkedItemIds[it.id];
+                    const isLocked = !!lockedItemIds[it.id];
                     const isHierarchyOpen = !!expandedHierarchyIds[it.id];
                     const itemNo = (flatTablePage - 1) * flatTableSize + idx + 1;
                     const isUpdatingThis = isUpdatingId === it.id;
@@ -1693,26 +1833,35 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                       <tr 
                         key={`${it.id}_table_${idx}`} 
                         className={`transition-colors ${
-                          isChecked 
+                          isLocked 
                             ? 'bg-emerald-50/90 hover:bg-emerald-100/70 border-l-4 border-l-emerald-600' 
                             : 'hover:bg-blue-50/30'
                         }`}
                       >
-                        {/* Kolom Checkbox & No */}
+                        {/* Kolom Gembok & No */}
                         <td className="py-3.5 px-3 text-center align-top space-y-1.5 w-14">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleCheckItem(it.id)}
-                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
-                            title="Tandai sudah dicek"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleLockItem(it.id)}
+                            className={`w-7 h-7 mx-auto rounded-xl flex items-center justify-center transition-all cursor-pointer border active:scale-90 ${
+                              isLocked
+                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs hover:bg-emerald-700 ring-2 ring-emerald-300/60'
+                                : 'bg-white hover:bg-slate-100 text-slate-400 border-slate-300 hover:text-emerald-600 hover:border-emerald-400 shadow-2xs'
+                            }`}
+                            title={isLocked ? "IKU Sudah Benar (Terkunci). Klik untuk buka gembok" : "Klik untuk gembok (IKU Sudah Benar)"}
+                          >
+                            {isLocked ? (
+                              <Lock size={15} className="stroke-[2.5]" />
+                            ) : (
+                              <Unlock size={14} className="stroke-[2]" />
+                            )}
+                          </button>
                           <span className="block text-[10px] font-mono font-bold text-slate-400">
                             #{itemNo}
                           </span>
-                          {isChecked && (
-                            <span className="block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 rounded px-1 py-0.2">
-                              DICEK
+                          {isLocked && (
+                            <span className="inline-block text-[8px] font-black text-emerald-800 uppercase tracking-tighter bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 leading-none">
+                              GEMBOK
                             </span>
                           )}
                         </td>
@@ -1745,11 +1894,32 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                             </div>
                           </div>
 
-                          {/* BARIS 2. Pindah Antar IKU / Aksi & Tombol Toggle Hirarki */}
+                          {/* BARIS 2. Aksi: Tombol Hirarki (Icon V) di Kiri Tombol Pindah IKU & Lepas IKU */}
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                             
-                            {/* Sisi Kiri: Aksi Pindah IKU & Lepas */}
+                            {/* Sisi Kiri: Tombol Hirarki (Icon V) + Pindah IKU + Lepas */}
                             <div className="flex flex-wrap items-center gap-2 relative">
+                              
+                              {/* Tombol Lihat Hirarki berupa Icon V di sebelah kiri tombol Pindah ke IKU Lain */}
+                              <button
+                                type="button"
+                                onClick={() => toggleItemHierarchy(it.id)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border active:scale-95 ${
+                                  isHierarchyOpen
+                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-200'
+                                    : 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 border-indigo-200 hover:border-indigo-300 shadow-2xs'
+                                }`}
+                                title={isHierarchyOpen ? "Tutup Hirarki (Tujuan, Sasaran, Program)" : "Lihat Hirarki (Tujuan, Sasaran, Program)"}
+                              >
+                                {isHierarchyOpen ? (
+                                  <ChevronUp size={14} className="stroke-[2.5]" />
+                                ) : (
+                                  <ChevronDown size={14} className="stroke-[2.5]" />
+                                )}
+                                <span className="font-extrabold">{isHierarchyOpen ? 'Tutup Hirarki' : 'Lihat Hirarki'}</span>
+                              </button>
+
+                              {/* Searchable Autocomplete Combobox Popover Pindah IKU */}
                               <div className="relative">
                                 <button
                                   type="button"
@@ -1860,21 +2030,17 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                               )}
                             </div>
 
-                            {/* Sisi Kanan: Tombol Buka/Tutup Hirarki Baris 3, 4, 5 */}
-                            <button
-                              type="button"
-                              onClick={() => toggleItemHierarchy(it.id)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                                isHierarchyOpen
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-300 shadow-2xs'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                              }`}
-                              title="Tampilkan / Sembunyikan Tujuan, Sasaran, & Program"
-                            >
-                              <Layers size={13} className={isHierarchyOpen ? "text-indigo-600" : "text-slate-500"} />
-                              <span>{isHierarchyOpen ? 'Tutup Hirarki' : 'Lihat Hirarki (Tujuan, Sasaran, Program)'}</span>
-                              <ChevronDown size={13} className={`transition-transform duration-200 ${isHierarchyOpen ? 'rotate-180 text-indigo-600' : 'text-slate-400'}`} />
-                            </button>
+                            {/* Sisi Kanan: Status Gembok / IKU Sudah Benar */}
+                            {isLocked ? (
+                              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-xl shadow-2xs">
+                                <Lock size={12} className="text-emerald-700" />
+                                <span>IKU Sudah Benar &amp; Terkunci</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                                Belum digembok
+                              </span>
+                            )}
                           </div>
 
                           {/* BARIS 3, 4, 5. Hirarki Tujuan, Sasaran, dan Program (Collapsible - Default Tertutup) */}

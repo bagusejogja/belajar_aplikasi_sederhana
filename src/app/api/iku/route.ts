@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { supabase } from '@/lib/supabase';
 
 interface IkuItem {
   id: number;
@@ -242,13 +243,28 @@ export async function GET(req: NextRequest) {
         return a.ref_iku.localeCompare(b.ref_iku, undefined, { numeric: true, sensitivity: 'base' });
       });
 
+    // Ambil daftar ID kegiatan yang terkunci (Gembok / IKU Benar) dari Supabase agar persisten lintas perangkat
+    let lockedIds: number[] = [];
+    try {
+      const { data: lockRows } = await supabase
+        .from('app_user_favorites')
+        .select('path')
+        .eq('user_id', 'global_iku_locked');
+      if (lockRows && lockRows.length > 0) {
+        lockedIds = lockRows.map(r => Number(r.path)).filter(n => !isNaN(n) && n > 0);
+      }
+    } catch (lockErr) {
+      console.warn('Gagal memuat lockedIds dari Supabase:', lockErr);
+    }
+
     return NextResponse.json({
       success: true,
       tahun: tahunParam,
       totalMatchedRows: filtered.length,
       totalGroups: groupedList.length,
       masters: filteredMasters,
-      groups: groupedList
+      groups: groupedList,
+      lockedIds: lockedIds
     });
 
   } catch (error: any) {
@@ -260,12 +276,96 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Pindah IKU atau Lepas/Hapus ke Belum Ada IKU
+// POST: Pindah IKU, Lepas/Hapus, serta Gembok / Buka Gembok (Persistensi Global)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, id, target_iku } = body;
+    const { action, id, ids, target_iku } = body;
 
+    // 1. Aksi Gembok Tunggal
+    if (action === 'lock') {
+      if (!id) {
+        return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
+      }
+      try {
+        await supabase.from('app_user_favorites').upsert(
+          [{ user_id: 'global_iku_locked', path: String(id) }],
+          { onConflict: 'user_id,path' }
+        );
+      } catch (e: any) {
+        console.error('Error saving lock to Supabase:', e);
+      }
+      return NextResponse.json({
+        success: true,
+        message: `Kegiatan #${id} berhasil digembok (IKU Sudah Benar)`,
+        id: Number(id)
+      });
+    }
+
+    // 2. Aksi Buka Gembok Tunggal
+    if (action === 'unlock') {
+      if (!id) {
+        return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
+      }
+      try {
+        await supabase.from('app_user_favorites')
+          .delete()
+          .eq('user_id', 'global_iku_locked')
+          .eq('path', String(id));
+      } catch (e: any) {
+        console.error('Error removing lock from Supabase:', e);
+      }
+      return NextResponse.json({
+        success: true,
+        message: `Gembok kegiatan #${id} berhasil dibuka`,
+        id: Number(id)
+      });
+    }
+
+    // 3. Aksi Gembok Massal (Batch Lock)
+    if (action === 'batch_lock') {
+      const targetIds: number[] = Array.isArray(ids) ? ids : (id ? [id] : []);
+      if (targetIds.length === 0) {
+        return NextResponse.json({ success: false, error: 'Daftar ID wajib diisi' }, { status: 400 });
+      }
+      try {
+        const rows = targetIds.map(item_id => ({
+          user_id: 'global_iku_locked',
+          path: String(item_id)
+        }));
+        await supabase.from('app_user_favorites').upsert(rows, { onConflict: 'user_id,path' });
+      } catch (e: any) {
+        console.error('Error batch saving locks to Supabase:', e);
+      }
+      return NextResponse.json({
+        success: true,
+        message: `${targetIds.length} kegiatan berhasil digembok`,
+        ids: targetIds
+      });
+    }
+
+    // 4. Aksi Buka Gembok Massal (Batch Unlock)
+    if (action === 'batch_unlock') {
+      const targetIds: number[] = Array.isArray(ids) ? ids : (id ? [id] : []);
+      if (targetIds.length === 0) {
+        return NextResponse.json({ success: false, error: 'Daftar ID wajib diisi' }, { status: 400 });
+      }
+      try {
+        await supabase.from('app_user_favorites')
+          .delete()
+          .eq('user_id', 'global_iku_locked')
+          .in('path', targetIds.map(String));
+      } catch (e: any) {
+        console.error('Error batch removing locks from Supabase:', e);
+      }
+      return NextResponse.json({
+        success: true,
+        message: `Gembok ${targetIds.length} kegiatan berhasil dibuka`,
+        ids: targetIds
+      });
+    }
+
+    // 5. Aksi Pindah IKU atau Lepas/Hapus
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
     }
