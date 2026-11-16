@@ -1566,37 +1566,6 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                           <span className="font-black text-slate-800">
                                             Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
                                           </span>
-
-                                          {/* Tombol Kunci Halaman Ini di samping Judul (Poin 5) */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const allLocked = paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]);
-                                              batchLockItems(paginatedItems, !allLocked);
-                                            }}
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
-                                              paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
-                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
-                                                : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-300 shadow-2xs'
-                                            }`}
-                                            title={
-                                              paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id])
-                                                ? "Buka kunci semua kegiatan di halaman ini"
-                                                : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
-                                            }
-                                          >
-                                            {paginatedItems.length > 0 && paginatedItems.every(it => !!lockedItemIds[it.id]) ? (
-                                              <>
-                                                <Lock size={12} className="text-white stroke-[2.5]" />
-                                                <span>Buka Kunci Halaman Ini</span>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Lock size={12} className="text-emerald-600 stroke-[2.5]" />
-                                                <span>Kunci Halaman Ini</span>
-                                              </>
-                                            )}
-                                          </button>
                                         </div>
 
                                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
@@ -2061,37 +2030,6 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                           <span className="font-black text-slate-800">
                             Rincian Kegiatan RKAT &amp; Aksi Pemetaan IKU
                           </span>
-
-                          {/* Tombol Kunci Halaman Ini di samping Judul (Poin 5) */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const allLocked = paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]);
-                              batchLockItems(paginatedTableItems, !allLocked);
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer active:scale-95 ${
-                              paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
-                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs hover:bg-emerald-700'
-                                : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-300 shadow-2xs'
-                            }`}
-                            title={
-                              paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id])
-                                ? "Buka kunci semua kegiatan di halaman ini"
-                                : "Kunci semua kegiatan di halaman ini (IKU Sudah Dipetakan & Terkunci)"
-                            }
-                          >
-                            {paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!lockedItemIds[it.id]) ? (
-                              <>
-                                <Lock size={12} className="text-white stroke-[2.5]" />
-                                <span>Buka Kunci Halaman Ini</span>
-                              </>
-                            ) : (
-                              <>
-                                <Lock size={12} className="text-emerald-600 stroke-[2.5]" />
-                                <span>Kunci Halaman Ini</span>
-                              </>
-                            )}
-                          </button>
                         </div>
 
                         <span className="text-[10px] font-bold text-slate-400 font-sans normal-case hidden sm:inline">
