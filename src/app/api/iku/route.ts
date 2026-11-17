@@ -253,12 +253,22 @@ export async function GET(req: NextRequest) {
     // Ambil daftar ID kegiatan yang terkunci (Kunci / IKU Sudah Dipetakan) dari Supabase agar persisten lintas perangkat
     let lockedIds: number[] = [];
     try {
-      const { data: lockRows } = await supabase
-        .from('app_user_favorites')
-        .select('path')
-        .eq('user_id', 'global_iku_locked');
-      if (lockRows && lockRows.length > 0) {
-        lockedIds = lockRows.map(r => Number(r.path)).filter(n => !isNaN(n) && n > 0);
+      // 1. Coba baca dari tabel khusus app_iku_locks
+      const { data: lockRows, error: lockErr } = await supabase
+        .from('app_iku_locks')
+        .select('kegiatan_id');
+
+      if (!lockErr && lockRows) {
+        lockedIds = lockRows.map(r => Number(r.kegiatan_id)).filter(n => !isNaN(n) && n > 0);
+      } else {
+        // Fallback jika tabel khusus belum dibuat di Supabase
+        const { data: legacyRows } = await supabase
+          .from('app_user_favorites')
+          .select('path')
+          .eq('user_id', 'global_iku_locked');
+        if (legacyRows && legacyRows.length > 0) {
+          lockedIds = legacyRows.map(r => Number(r.path)).filter(n => !isNaN(n) && n > 0);
+        }
       }
     } catch (lockErr) {
       console.warn('Gagal memuat lockedIds dari Supabase:', lockErr);
@@ -266,14 +276,15 @@ export async function GET(req: NextRequest) {
 
     // Ambil custom uraian IKU jika pernah diubah oleh pengguna
     try {
-      const { data: uraianRows } = await supabase
-        .from('app_user_favorites')
-        .select('path, title')
-        .eq('user_id', 'global_iku_uraian');
-      if (uraianRows && uraianRows.length > 0) {
+      // 1. Coba baca dari tabel khusus app_iku_uraian
+      const { data: uraianRows, error: uraianErr } = await supabase
+        .from('app_iku_uraian')
+        .select('ref_iku, uraian');
+
+      if (!uraianErr && uraianRows && uraianRows.length > 0) {
         uraianRows.forEach((r: any) => {
-          const ikuName = r.path;
-          const customUraian = r.title;
+          const ikuName = r.ref_iku;
+          const customUraian = r.uraian;
           if (ikuName && customUraian !== undefined) {
             const m = filteredMasters.find(x => x.nama_ref_iku === ikuName);
             if (m) m.uraian = customUraian;
@@ -281,6 +292,24 @@ export async function GET(req: NextRequest) {
             if (g) g.uraian = customUraian;
           }
         });
+      } else {
+        // Fallback jika tabel khusus belum dibuat di Supabase
+        const { data: legacyUraian } = await supabase
+          .from('app_user_favorites')
+          .select('path, title')
+          .eq('user_id', 'global_iku_uraian');
+        if (legacyUraian && legacyUraian.length > 0) {
+          legacyUraian.forEach((r: any) => {
+            const ikuName = r.path;
+            const customUraian = r.title;
+            if (ikuName && customUraian !== undefined) {
+              const m = filteredMasters.find(x => x.nama_ref_iku === ikuName);
+              if (m) m.uraian = customUraian;
+              const g = groupedList.find(x => x.ref_iku === ikuName);
+              if (g) g.uraian = customUraian;
+            }
+          });
+        }
       }
     } catch (e) {
       console.warn('Gagal memuat custom uraian dari Supabase:', e);
@@ -311,32 +340,43 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, id, ids, target_iku } = body;
 
-    // 1. Aksi Gembok Tunggal
+    // 1. Aksi Kunci Tunggal
     if (action === 'lock') {
       if (!id) {
         return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
       }
       try {
-        await supabase.from('app_user_favorites').upsert(
-          [{ user_id: 'global_iku_locked', path: String(id) }],
-          { onConflict: 'user_id,path' }
+        const { error: lockErr } = await supabase.from('app_iku_locks').upsert(
+          [{ kegiatan_id: Number(id) }],
+          { onConflict: 'kegiatan_id' }
         );
+        if (lockErr) {
+          // Fallback legacy
+          await supabase.from('app_user_favorites').upsert(
+            [{ user_id: 'global_iku_locked', path: String(id) }],
+            { onConflict: 'user_id,path' }
+          );
+        }
       } catch (e: any) {
         console.error('Error saving lock to Supabase:', e);
       }
       return NextResponse.json({
         success: true,
-        message: `Kegiatan #${id} berhasil digembok (IKU Sudah Benar)`,
+        message: `Kegiatan #${id} berhasil dikunci (IKU Sudah Dipetakan & Terkunci)`,
         id: Number(id)
       });
     }
 
-    // 2. Aksi Buka Gembok Tunggal
+    // 2. Aksi Buka Kunci Tunggal
     if (action === 'unlock') {
       if (!id) {
         return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
       }
       try {
+        await supabase.from('app_iku_locks')
+          .delete()
+          .eq('kegiatan_id', Number(id));
+        // Bersihkan juga dari legacy jika ada
         await supabase.from('app_user_favorites')
           .delete()
           .eq('user_id', 'global_iku_locked')
@@ -346,40 +386,49 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({
         success: true,
-        message: `Gembok kegiatan #${id} berhasil dibuka`,
+        message: `Kunci kegiatan #${id} berhasil dibuka`,
         id: Number(id)
       });
     }
 
-    // 3. Aksi Gembok Massal (Batch Lock)
+    // 3. Aksi Kunci Massal (Batch Lock)
     if (action === 'batch_lock') {
       const targetIds: number[] = Array.isArray(ids) ? ids : (id ? [id] : []);
       if (targetIds.length === 0) {
         return NextResponse.json({ success: false, error: 'Daftar ID wajib diisi' }, { status: 400 });
       }
       try {
-        const rows = targetIds.map(item_id => ({
-          user_id: 'global_iku_locked',
-          path: String(item_id)
-        }));
-        await supabase.from('app_user_favorites').upsert(rows, { onConflict: 'user_id,path' });
+        const lockRows = targetIds.map(item_id => ({ kegiatan_id: Number(item_id) }));
+        const { error: batchErr } = await supabase.from('app_iku_locks').upsert(lockRows, { onConflict: 'kegiatan_id' });
+        if (batchErr) {
+          // Fallback legacy
+          const rows = targetIds.map(item_id => ({
+            user_id: 'global_iku_locked',
+            path: String(item_id)
+          }));
+          await supabase.from('app_user_favorites').upsert(rows, { onConflict: 'user_id,path' });
+        }
       } catch (e: any) {
         console.error('Error batch saving locks to Supabase:', e);
       }
       return NextResponse.json({
         success: true,
-        message: `${targetIds.length} kegiatan berhasil digembok`,
+        message: `${targetIds.length} kegiatan berhasil dikunci`,
         ids: targetIds
       });
     }
 
-    // 4. Aksi Buka Gembok Massal (Batch Unlock)
+    // 4. Aksi Buka Kunci Massal (Batch Unlock)
     if (action === 'batch_unlock') {
       const targetIds: number[] = Array.isArray(ids) ? ids : (id ? [id] : []);
       if (targetIds.length === 0) {
         return NextResponse.json({ success: false, error: 'Daftar ID wajib diisi' }, { status: 400 });
       }
       try {
+        await supabase.from('app_iku_locks')
+          .delete()
+          .in('kegiatan_id', targetIds.map(Number));
+        // Bersihkan juga dari legacy
         await supabase.from('app_user_favorites')
           .delete()
           .eq('user_id', 'global_iku_locked')
@@ -389,7 +438,7 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({
         success: true,
-        message: `Gembok ${targetIds.length} kegiatan berhasil dibuka`,
+        message: `Kunci ${targetIds.length} kegiatan berhasil dibuka`,
         ids: targetIds
       });
     }
@@ -408,12 +457,18 @@ export async function POST(req: NextRequest) {
         saveIkuData(ikuData);
       }
 
-      // Simpan juga ke Supabase app_user_favorites agar persisten global di cloud
+      // Simpan ke Supabase app_iku_uraian (dengan fallback ke app_user_favorites)
       try {
-        await supabase.from('app_user_favorites').upsert(
-          [{ user_id: 'global_iku_uraian', path: ref_iku, title: uraian || '' }],
-          { onConflict: 'user_id,path' }
+        const { error: uraianErr } = await supabase.from('app_iku_uraian').upsert(
+          [{ ref_iku: ref_iku, uraian: uraian || '', updated_at: new Date().toISOString() }],
+          { onConflict: 'ref_iku' }
         );
+        if (uraianErr) {
+          await supabase.from('app_user_favorites').upsert(
+            [{ user_id: 'global_iku_uraian', path: ref_iku, title: uraian || '' }],
+            { onConflict: 'user_id,path' }
+          );
+        }
       } catch (err) {
         console.warn('Gagal simpan custom uraian ke Supabase:', err);
       }
