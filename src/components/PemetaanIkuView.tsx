@@ -8,8 +8,9 @@ import {
   RefreshCw, FileSpreadsheet, ArrowLeft, Building2, HelpCircle,
   Trash2, ArrowRightLeft, AlertTriangle, RotateCcw,
   Check, X, Eye, EyeOff, PieChart as PieChartIcon, CheckSquare, Square,
-  Lock, Unlock, Info, Edit3, Pencil, Loader2
+  Lock, Unlock, Info, Edit3, Pencil, Loader2, PlusCircle, FileEdit
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import ExcelJS from 'exceljs';
 import {
   PieChart, Pie, Tooltip, ResponsiveContainer,
@@ -230,6 +231,91 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     setTimeout(() => {
       setToastMsg(null);
     }, 5000);
+  };
+
+  // Cek apakah pengguna sedang login (Mode Login Dashboard vs Publik Tanpa Login)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session);
+    });
+  }, []);
+  const canManageActivities = hideHeader || isLoggedIn;
+
+  // State Modal Tambah & Edit Kegiatan
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<IkuItem | null>(null);
+  const [formNamaKegiatan, setFormNamaKegiatan] = useState('');
+  const [formKodeKegiatan, setFormKodeKegiatan] = useState('');
+  const [formNamaProgram, setFormNamaProgram] = useState('');
+  const [formNamaSasaran, setFormNamaSasaran] = useState('');
+  const [formNamaTujuan, setFormNamaTujuan] = useState('');
+  const [formTargetIku, setFormTargetIku] = useState('Belum Ada IKU');
+  const [formTahun, setFormTahun] = useState('2026');
+  const [isSavingActivity, setIsSavingActivity] = useState(false);
+
+  const handleOpenAddModal = () => {
+    setEditingActivity(null);
+    setFormNamaKegiatan('');
+    setFormKodeKegiatan('');
+    setFormNamaProgram('');
+    setFormNamaSasaran('');
+    setFormNamaTujuan('');
+    setFormTargetIku(selectedRef !== 'ALL' ? selectedRef : (masters[0]?.nama_ref_iku || 'Belum Ada IKU'));
+    setFormTahun(selectedTahun !== 'all' ? selectedTahun : '2026');
+    setActivityModalOpen(true);
+  };
+
+  const handleOpenEditModal = (item: IkuItem) => {
+    setEditingActivity(item);
+    setFormNamaKegiatan(item.kegiatan_nama || '');
+    setFormKodeKegiatan(item.kegiatan_kode || '');
+    setFormNamaProgram(item.program_nama || '');
+    setFormNamaSasaran(item.sasaran_nama || '');
+    setFormNamaTujuan(item.tujuan_nama || '');
+    setFormTargetIku(item.ref_iku || 'Belum Ada IKU');
+    setFormTahun(String(item.ref_tahun_iku || 2026));
+    setActivityModalOpen(true);
+  };
+
+  const handleSaveActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNamaKegiatan.trim()) {
+      showToast('Nama kegiatan wajib diisi!', 'error');
+      return;
+    }
+
+    setIsSavingActivity(true);
+    try {
+      const res = await fetch('/api/iku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_kegiatan',
+          id: editingActivity?.id,
+          kegiatan_nama: formNamaKegiatan.trim(),
+          kegiatan_kode: formKodeKegiatan.trim(),
+          program_nama: formNamaProgram.trim(),
+          sasaran_nama: formNamaSasaran.trim(),
+          tujuan_nama: formNamaTujuan.trim(),
+          ref_iku: formTargetIku,
+          ref_tahun_iku: Number(formTahun) || 2026
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal menyimpan kegiatan');
+      }
+
+      showToast(json.message || 'Kegiatan berhasil disimpan!', 'success');
+      setActivityModalOpen(false);
+      fetchIkuData();
+    } catch (err: any) {
+      showToast(err.message || 'Gagal menyimpan kegiatan', 'error');
+    } finally {
+      setIsSavingActivity(false);
+    }
   };
 
   // Muat status kunci dari localStorage saat awal render untuk respon instan
@@ -759,6 +845,19 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                 <Download size={14} />
                 <span>Unduh Semua ({allFlattenedItems.length})</span>
               </button>
+
+              {/* Tombol Tambah Kegiatan Baru (Hanya untuk Pengguna Login) */}
+              {canManageActivities && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddModal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-lg shadow-indigo-900/30 transition-all cursor-pointer"
+                  title="Tambah kegiatan baru ke dalam pemetaan IKU (Khusus mode login)"
+                >
+                  <PlusCircle size={15} className="stroke-[2.5]" />
+                  <span>Tambah Kegiatan</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1773,6 +1872,19 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                                   ⚠️ Belum Ada IKU
                                                 </span>
                                               )}
+
+                                              {/* Tombol Edit Kegiatan (Khusus Pengguna Login) */}
+                                              {canManageActivities && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleOpenEditModal(it)}
+                                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 hover:border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                                                  title="Edit data referensi kegiatan ini (Nama Kegiatan, Kode, Program, Sasaran, dsb)"
+                                                >
+                                                  <FileEdit size={12} className="text-amber-700" />
+                                                  <span>Edit</span>
+                                                </button>
+                                              )}
                                             </div>
 
                                             {/* Sisi Kanan: Status Kunci / IKU Sudah Dipetakan & Terkunci */}
@@ -2245,6 +2357,18 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                                   ⚠️ Belum Ada IKU
                                 </span>
                               )}
+
+                              {canManageActivities && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(it)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200 hover:border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                                  title="Edit data referensi kegiatan ini (Nama Kegiatan, Kode, Program, Sasaran, dsb)"
+                                >
+                                  <FileEdit size={12} className="text-amber-700" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
                             </div>
 
                             {/* Sisi Kanan: Status Kunci / IKU Sudah Dipetakan & Terkunci */}
@@ -2367,6 +2491,182 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                   Selanjutnya
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL TAMBAH / EDIT KEGIATAN (HANYA UNTUK LOGIN / DASHBOARD) */}
+        {activityModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div 
+              className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto flex flex-col p-6 sm:p-7 space-y-5 animate-in zoom-in-95 duration-150"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-black">
+                    {editingActivity ? <FileEdit size={20} /> : <PlusCircle size={20} />}
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-800">
+                      {editingActivity ? 'Edit Referensi Kegiatan' : 'Tambah Referensi Kegiatan Baru'}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {editingActivity 
+                        ? `Memperbarui rincian kegiatan #${editingActivity.id}` 
+                        : 'Menambahkan kegiatan baru yang akan dipetakan ke IKU'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivityModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  aria-label="Tutup"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveActivity} className="space-y-4">
+                {/* Nama Kegiatan */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Nama Kegiatan (RKAT) <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={formNamaKegiatan}
+                    onChange={(e) => setFormNamaKegiatan(e.target.value)}
+                    placeholder="Contoh: Penyelenggaraan Ujian Akhir Semester Gasal 2025/2026..."
+                    className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-2xl px-3.5 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-y"
+                  />
+                </div>
+
+                {/* Kode Kegiatan & Tahun RKAT */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Kode Kegiatan (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formKodeKegiatan}
+                      onChange={(e) => setFormKodeKegiatan(e.target.value)}
+                      placeholder="Contoh: 1.01.02.001"
+                      className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-2xl px-3.5 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Tahun RKAT
+                    </label>
+                    <select
+                      value={formTahun}
+                      onChange={(e) => setFormTahun(e.target.value)}
+                      className="w-full text-xs font-bold text-slate-800 border border-slate-200 rounded-2xl px-3.5 py-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    >
+                      <option value="2026">Tahun 2026</option>
+                      <option value="2025">Tahun 2025</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Petakan ke Referensi IKU */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Petakan ke Referensi IKU
+                  </label>
+                  <select
+                    value={formTargetIku}
+                    onChange={(e) => setFormTargetIku(e.target.value)}
+                    className="w-full text-xs font-semibold text-slate-800 border border-slate-200 rounded-2xl px-3.5 py-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  >
+                    <option value="Belum Ada IKU">⚠️ Belum Ada IKU (Tampung di antrean)</option>
+                    {masters.map((m) => (
+                      <option key={`${m.ref_tahun_iku}-${m.nama_ref_iku}`} value={m.nama_ref_iku}>
+                        [{m.ref_tahun_iku}] {m.nama_ref_iku}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Hirarki Tambahan: Program, Sasaran, Tujuan */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Hirarki Perencanaan (Opsional)
+                  </span>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Nama Program
+                    </label>
+                    <input
+                      type="text"
+                      value={formNamaProgram}
+                      onChange={(e) => setFormNamaProgram(e.target.value)}
+                      placeholder="Contoh: Program Peningkatan Mutu Akademik"
+                      className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Nama Sasaran
+                      </label>
+                      <input
+                        type="text"
+                        value={formNamaSasaran}
+                        onChange={(e) => setFormNamaSasaran(e.target.value)}
+                        placeholder="Contoh: Meningkatnya kualitas lulusan"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Nama Tujuan
+                      </label>
+                      <input
+                        type="text"
+                        value={formNamaTujuan}
+                        onChange={(e) => setFormNamaTujuan(e.target.value)}
+                        placeholder="Contoh: Terwujudnya tata kelola unggul"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Aksi Modal */}
+                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setActivityModalOpen(false)}
+                    disabled={isSavingActivity}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingActivity}
+                    className="inline-flex items-center gap-1.5 px-5 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold rounded-2xl text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingActivity ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={13} />
+                        <span>{editingActivity ? 'Simpan Perubahan' : 'Tambah Kegiatan'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

@@ -93,6 +93,71 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Gabungkan kegiatan custom (baru / editan) dari Supabase app_iku_custom_kegiatan
+    try {
+      const { data: customKegiatanList, error: customErr } = await supabase
+        .from('app_iku_custom_kegiatan')
+        .select('*');
+
+      if (!customErr && customKegiatanList && customKegiatanList.length > 0) {
+        customKegiatanList.forEach((c: any) => {
+          if (c.is_deleted) {
+            const idx = allMappings.findIndex(m => m.id === Number(c.kegiatan_id || c.id));
+            if (idx >= 0) allMappings.splice(idx, 1);
+            return;
+          }
+
+          if (c.kegiatan_id) {
+            // Override kegiatan yang sudah ada
+            const existing = allMappings.find(m => m.id === Number(c.kegiatan_id));
+            if (existing) {
+              if (c.kegiatan_nama) existing.kegiatan_nama = c.kegiatan_nama;
+              if (c.kegiatan_kode !== null && c.kegiatan_kode !== undefined) existing.kegiatan_kode = c.kegiatan_kode;
+              if (c.program_nama !== null && c.program_nama !== undefined) existing.program_nama = c.program_nama;
+              if (c.program_kode !== null && c.program_kode !== undefined) existing.program_kode = c.program_kode;
+              if (c.sasaran_nama !== null && c.sasaran_nama !== undefined) existing.sasaran_nama = c.sasaran_nama;
+              if (c.tujuan_nama !== null && c.tujuan_nama !== undefined) existing.tujuan_nama = c.tujuan_nama;
+              if (c.ref_iku) existing.ref_iku = c.ref_iku;
+              if (c.ref_tahun_iku) existing.ref_tahun_iku = c.ref_tahun_iku;
+            }
+          } else {
+            // Kegiatan baru
+            const newId = 100000 + Number(c.id);
+            if (!allMappings.some(m => m.id === newId)) {
+              allMappings.push({
+                id: newId,
+                kegiatan_id: String(newId),
+                kegiatan_kode: c.kegiatan_kode || '',
+                kegiatan_nama: c.kegiatan_nama,
+                program_id: '',
+                program_kode: c.program_kode || '',
+                program_nama: c.program_nama || '',
+                indikator_program_id: '',
+                indikator_program_kode: '',
+                indikator_program_nama: '',
+                sasaran_id: '',
+                sasaran_kode: '',
+                sasaran_nama: c.sasaran_nama || '',
+                indikator_sasaran_id: '',
+                indikator_sasaran_kode: '',
+                indikator_sasaran_nama: '',
+                tujuan_id: '',
+                tujuan_kode: '',
+                tujuan_nama: c.tujuan_nama || '',
+                indikator_tujuan_id: '',
+                indikator_tujuan_kode: '',
+                indikator_tujuan_nama: '',
+                ref_iku: c.ref_iku || 'Belum Ada IKU',
+                ref_tahun_iku: c.ref_tahun_iku || 2026
+              });
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Gagal memuat custom kegiatan dari Supabase:', e);
+    }
+
     // Filter pemetaan
     let filtered = allMappings.filter(item => {
       // 1. Filter tahun
@@ -480,7 +545,153 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 6. Aksi Pindah IKU atau Lepas/Hapus
+    // 6. Aksi Tambah / Edit Detail Kegiatan (Baru / Override)
+    if (action === 'save_kegiatan') {
+      const {
+        id: editId,
+        kegiatan_nama,
+        kegiatan_kode,
+        program_nama,
+        program_kode,
+        sasaran_nama,
+        tujuan_nama,
+        ref_iku: inputRefIku,
+        ref_tahun_iku: inputTahun
+      } = body;
+
+      if (!kegiatan_nama || !String(kegiatan_nama).trim()) {
+        return NextResponse.json({ success: false, error: 'Nama kegiatan wajib diisi' }, { status: 400 });
+      }
+
+      const cleanNama = String(kegiatan_nama).trim();
+      const cleanRefIku = inputRefIku && String(inputRefIku).trim() ? String(inputRefIku).trim() : 'Belum Ada IKU';
+      const cleanTahun = Number(inputTahun) || 2026;
+
+      // 1. Simpan ke Supabase app_iku_custom_kegiatan
+      try {
+        if (editId) {
+          await supabase.from('app_iku_custom_kegiatan').upsert({
+            kegiatan_id: Number(editId),
+            kegiatan_nama: cleanNama,
+            kegiatan_kode: kegiatan_kode || '',
+            program_nama: program_nama || '',
+            program_kode: program_kode || '',
+            sasaran_nama: sasaran_nama || '',
+            tujuan_nama: tujuan_nama || '',
+            ref_iku: cleanRefIku,
+            ref_tahun_iku: cleanTahun,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'kegiatan_id' });
+        } else {
+          await supabase.from('app_iku_custom_kegiatan').insert({
+            kegiatan_nama: cleanNama,
+            kegiatan_kode: kegiatan_kode || '',
+            program_nama: program_nama || '',
+            program_kode: program_kode || '',
+            sasaran_nama: sasaran_nama || '',
+            tujuan_nama: tujuan_nama || '',
+            ref_iku: cleanRefIku,
+            ref_tahun_iku: cleanTahun
+          });
+        }
+      } catch (err) {
+        console.warn('Gagal simpan ke app_iku_custom_kegiatan:', err);
+      }
+
+      // 2. Simpan juga ke file lokal iku-data.json
+      try {
+        const ikuData = loadIkuData();
+        if (ikuData && ikuData.mappings) {
+          if (editId) {
+            const item = ikuData.mappings.find(m => m.id === Number(editId));
+            if (item) {
+              item.kegiatan_nama = cleanNama;
+              if (kegiatan_kode !== undefined) item.kegiatan_kode = kegiatan_kode;
+              if (program_nama !== undefined) item.program_nama = program_nama;
+              if (program_kode !== undefined) item.program_kode = program_kode;
+              if (sasaran_nama !== undefined) item.sasaran_nama = sasaran_nama;
+              if (tujuan_nama !== undefined) item.tujuan_nama = tujuan_nama;
+              item.ref_iku = cleanRefIku;
+              item.ref_tahun_iku = cleanTahun;
+              saveIkuData(ikuData);
+            }
+          } else {
+            const nextId = Math.max(...ikuData.mappings.map(m => m.id || 0), 3000) + 1;
+            ikuData.mappings.push({
+              id: nextId,
+              kegiatan_id: String(nextId),
+              kegiatan_kode: kegiatan_kode || '',
+              kegiatan_nama: cleanNama,
+              program_id: '',
+              program_kode: program_kode || '',
+              program_nama: program_nama || '',
+              indikator_program_id: '',
+              indikator_program_kode: '',
+              indikator_program_nama: '',
+              sasaran_id: '',
+              sasaran_kode: '',
+              sasaran_nama: sasaran_nama || '',
+              indikator_sasaran_id: '',
+              indikator_sasaran_kode: '',
+              indikator_sasaran_nama: '',
+              tujuan_id: '',
+              tujuan_kode: '',
+              tujuan_nama: tujuan_nama || '',
+              indikator_tujuan_id: '',
+              indikator_tujuan_kode: '',
+              indikator_tujuan_nama: '',
+              ref_iku: cleanRefIku,
+              ref_tahun_iku: cleanTahun
+            });
+            saveIkuData(ikuData);
+          }
+        }
+      } catch (err) {
+        console.warn('Simpan file lokal iku-data.json dilewati:', err);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: editId ? `Kegiatan "${cleanNama}" berhasil diperbarui` : `Kegiatan baru "${cleanNama}" berhasil ditambahkan`
+      });
+    }
+
+    // 7. Aksi Hapus Kegiatan
+    if (action === 'delete_kegiatan') {
+      if (!id) {
+        return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
+      }
+
+      try {
+        await supabase.from('app_iku_custom_kegiatan').upsert({
+          kegiatan_id: Number(id),
+          is_deleted: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'kegiatan_id' });
+      } catch (err) {
+        console.warn('Gagal tandai hapus di app_iku_custom_kegiatan:', err);
+      }
+
+      try {
+        const ikuData = loadIkuData();
+        if (ikuData && ikuData.mappings) {
+          const idx = ikuData.mappings.findIndex(m => m.id === Number(id));
+          if (idx >= 0) {
+            ikuData.mappings.splice(idx, 1);
+            saveIkuData(ikuData);
+          }
+        }
+      } catch (err) {
+        console.warn('Hapus dari file lokal dilewati:', err);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Kegiatan berhasil dihapus`
+      });
+    }
+
+    // 8. Aksi Pindah IKU atau Lepas/Hapus
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID kegiatan wajib diisi' }, { status: 400 });
     }
@@ -497,6 +708,23 @@ export async function POST(req: NextRequest) {
       targetItem.ref_iku = 'Belum Ada IKU';
     } else if (action === 'move') {
       targetItem.ref_iku = target_iku && target_iku.trim() ? target_iku.trim() : 'Belum Ada IKU';
+    }
+
+    // Sinkronisasi perpindahan ke Supabase app_iku_custom_kegiatan agar persisten di cloud
+    try {
+      await supabase.from('app_iku_custom_kegiatan').upsert({
+        kegiatan_id: targetItem.id,
+        kegiatan_nama: targetItem.kegiatan_nama,
+        kegiatan_kode: targetItem.kegiatan_kode,
+        program_nama: targetItem.program_nama,
+        sasaran_nama: targetItem.sasaran_nama,
+        tujuan_nama: targetItem.tujuan_nama,
+        ref_iku: targetItem.ref_iku,
+        ref_tahun_iku: targetItem.ref_tahun_iku || 2026,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'kegiatan_id' });
+    } catch (err) {
+      console.warn('Gagal sinkron move ke Supabase:', err);
     }
 
     // Simpan perubahan ke memory & file
