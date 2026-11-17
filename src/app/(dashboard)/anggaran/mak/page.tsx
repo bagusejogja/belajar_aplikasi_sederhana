@@ -863,180 +863,241 @@ export default function MonitoringMakPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* 🔴 TAB SWITCHER UTAMA: 3 REKAP LAYANAN (MAK, RKAT, TERJADWAL) + IKU & PILIHAN LINK */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-2.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {/* Tab 1: Revisi MAK */}
+      {/* 🔴 MODUL SUITE: REKAP LAYANAN ANGGARAN & IKU (STANDAR DESIGN SYSTEM) */}
+      <div className="bg-white/95 backdrop-blur-sm p-3 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-xs space-y-3">
+        {/* Top Header Label & Akses Cepat */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-700">
+              <PieChartIcon size={13} />
+            </div>
+            <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">
+              Modul Layanan Anggaran &amp; RKAT Terpadu
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+              • Revisi MAK, Perubahan RKAT, Revisi Terjadwal, &amp; Katalog IKU
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mr-1 hidden sm:inline">Form Publik:</span>
+            {/* Quick Links cleanly styled */}
+            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+              <Link
+                href="/input-mak"
+                target="_blank"
+                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-rose-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+                title="Buka form input MAK tanpa login"
+              >
+                <ExternalLink size={10} className="text-rose-500" />
+                <span>Form MAK</span>
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
+                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Salin tautan form MAK"
+              >
+                {copiedLinkUrl === '/input-mak' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
+              </button>
+            </div>
+
+            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+              <Link
+                href="/input-rkat"
+                target="_blank"
+                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-blue-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+                title="Buka form input RKAT tanpa login"
+              >
+                <ExternalLink size={10} className="text-blue-500" />
+                <span>Form RKAT</span>
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
+                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Salin tautan form RKAT"
+              >
+                {copiedLinkUrl === '/input-rkat' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
+              </button>
+            </div>
+
+            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+              <Link
+                href="/input-form"
+                target="_blank"
+                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-emerald-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+                title="Buka form revisi terjadwal tanpa login"
+              >
+                <ExternalLink size={10} className="text-emerald-500" />
+                <span>Form Terjadwal</span>
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => handleCopyLinkUrl('/input-form', e)}
+                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Salin tautan form terjadwal"
+              >
+                {copiedLinkUrl === '/input-form' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
+              </button>
+            </div>
+
+            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+              <Link
+                href="/iku"
+                target="_blank"
+                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+                title="Buka katalog IKU tanpa login"
+              >
+                <ExternalLink size={10} className="text-indigo-500" />
+                <span>Katalog IKU</span>
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => handleCopyLinkUrl('/iku', e)}
+                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Salin tautan katalog IKU"
+              >
+                {copiedLinkUrl === '/iku' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
+              </button>
+            </div>
+
+            <Link
+              href="/anggaran/layanan-publik"
+              className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg text-[11px] font-bold shadow-2xs hover:opacity-95 transition-all"
+              title="Buka Pusat Layanan Publik Terpadu"
+            >
+              <Sparkles size={11} />
+              <span>Portal Publik</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Navigation Grid: Standar Design System (4 Tombol Kartu Seragam) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Card 1: Rekap Revisi MAK */}
           <button
             type="button"
             onClick={() => setMainSection('tolakan-mak')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`group flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[48px] text-left ${
               mainSection === 'tolakan-mak'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-200 scale-[1.01]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-rose-600 via-rose-600 to-pink-700 text-white shadow-md shadow-rose-200/70 border-rose-500 ring-1 ring-rose-500/40 scale-[1.01]'
+                : 'bg-white hover:bg-rose-50/60 text-slate-700 hover:text-rose-700 border-slate-200/90 hover:border-rose-200 hover:shadow-2xs active:scale-[0.99]'
             }`}
           >
-            <ClipboardList size={15} />
-            <span>Rekap Revisi MAK</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              mainSection === 'tolakan-mak' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            <div className={`p-2 rounded-lg shrink-0 ${
+              mainSection === 'tolakan-mak'
+                ? 'bg-white/20 text-white'
+                : 'bg-rose-50 text-rose-600 group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors'
             }`}>
-              {data.filter(r => (r.kategori || 'Perubahan MAK') !== 'Perubahan RKAT').length}
-            </span>
+              <ClipboardList size={16} />
+            </div>
+            <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+              <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
+                Rekap Revisi MAK
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                mainSection === 'tolakan-mak'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-slate-100 text-slate-500 group-hover:bg-rose-100/70 group-hover:text-rose-700'
+              }`}>
+                {data.filter(r => (r.kategori || 'Perubahan MAK') !== 'Perubahan RKAT').length} Berkas
+              </span>
+            </div>
           </button>
 
-          {/* Tab 2: Perubahan RKAT */}
+          {/* Card 2: Rekap Perubahan RKAT */}
           <button
             type="button"
             onClick={() => setMainSection('pengajuan-rkat')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`group flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[48px] text-left ${
               mainSection === 'pengajuan-rkat'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-[1.01]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
+                : 'bg-white hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 hover:shadow-2xs active:scale-[0.99]'
             }`}
           >
-            <FileSpreadsheet size={15} />
-            <span>Rekap Perubahan RKAT</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              mainSection === 'pengajuan-rkat' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+            <div className={`p-2 rounded-lg shrink-0 ${
+              mainSection === 'pengajuan-rkat'
+                ? 'bg-white/20 text-white'
+                : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors'
             }`}>
-              {rkatSubmissions.length}
-            </span>
+              <FileSpreadsheet size={16} />
+            </div>
+            <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+              <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
+                Rekap Perubahan RKAT
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                mainSection === 'pengajuan-rkat'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100/70 group-hover:text-blue-700'
+              }`}>
+                {rkatSubmissions.length} Berkas
+              </span>
+            </div>
           </button>
 
-          {/* Tab 3: Revisi Terjadwal */}
+          {/* Card 3: Revisi Terjadwal */}
           <button
             type="button"
             onClick={() => setMainSection('revisi-terjadwal')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`group flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[48px] text-left ${
               mainSection === 'revisi-terjadwal'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 scale-[1.01]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-200/70 border-emerald-500 ring-1 ring-emerald-500/40 scale-[1.01]'
+                : 'bg-white hover:bg-emerald-50/60 text-slate-700 hover:text-emerald-700 border-slate-200/90 hover:border-emerald-200 hover:shadow-2xs active:scale-[0.99]'
             }`}
           >
-            <Calendar size={15} />
-            <span>Revisi Terjadwal</span>
-            {usulanCount > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                mainSection === 'revisi-terjadwal' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
-              }`}>
-                {usulanCount}
+            <div className={`p-2 rounded-lg shrink-0 ${
+              mainSection === 'revisi-terjadwal'
+                ? 'bg-white/20 text-white'
+                : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors'
+            }`}>
+              <Calendar size={16} />
+            </div>
+            <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+              <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
+                Revisi Terjadwal
               </span>
-            )}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                mainSection === 'revisi-terjadwal'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-100/70 group-hover:text-emerald-700'
+              }`}>
+                {usulanCount > 0 ? `${usulanCount} Usulan` : 'Form Usulan'}
+              </span>
+            </div>
           </button>
 
-          {/* Tab 4: Katalog & Pemetaan IKU */}
+          {/* Card 4: Katalog & Pemetaan IKU */}
           <button
             type="button"
             onClick={() => setMainSection('katalog-iku')}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`group flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[48px] text-left ${
               mainSection === 'katalog-iku'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-[1.01]'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-200/70 border-indigo-500 ring-1 ring-indigo-500/40 scale-[1.01]'
+                : 'bg-white hover:bg-indigo-50/60 text-slate-700 hover:text-indigo-700 border-slate-200/90 hover:border-indigo-200 hover:shadow-2xs active:scale-[0.99]'
             }`}
           >
-            <Target size={15} />
-            <span>Katalog & Pemetaan IKU</span>
+            <div className={`p-2 rounded-lg shrink-0 ${
+              mainSection === 'katalog-iku'
+                ? 'bg-white/20 text-white'
+                : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 group-hover:text-indigo-700 transition-colors'
+            }`}>
+              <Target size={16} />
+            </div>
+            <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+              <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
+                Katalog &amp; Pemetaan IKU
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                mainSection === 'katalog-iku'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100/70 group-hover:text-indigo-700'
+              }`}>
+                Pemetaan RKAT
+              </span>
+            </div>
           </button>
-        </div>
-
-        {/* Sisi Kanan: Pilihan Link Akses Mandiri & Tombol Copy */}
-        <div className="flex flex-wrap items-center gap-1.5 self-end lg:self-auto">
-          <span className="text-[11px] font-bold text-slate-400 mr-1 hidden xl:inline">Link Publik:</span>
-
-          {/* Link Form MAK */}
-          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            <Link
-              href="/input-mak"
-              target="_blank"
-              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-rose-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-              title="Buka form input MAK tanpa login"
-            >
-              <ExternalLink size={11} className="text-rose-500" />
-              <span>Form MAK</span>
-            </Link>
-            <button
-              type="button"
-              onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Salin link publik form MAK"
-            >
-              {copiedLinkUrl === '/input-mak' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
-            </button>
-          </div>
-
-          {/* Link Form RKAT */}
-          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            <Link
-              href="/input-rkat"
-              target="_blank"
-              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-blue-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-              title="Buka form input RKAT tanpa login"
-            >
-              <ExternalLink size={11} className="text-blue-500" />
-              <span>Form RKAT</span>
-            </Link>
-            <button
-              type="button"
-              onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Salin link publik form RKAT"
-            >
-              {copiedLinkUrl === '/input-rkat' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
-            </button>
-          </div>
-
-          {/* Link Form Terjadwal */}
-          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            <Link
-              href="/input-form"
-              target="_blank"
-              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-emerald-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-              title="Buka form revisi terjadwal tanpa login"
-            >
-              <ExternalLink size={11} className="text-emerald-500" />
-              <span>Form Terjadwal</span>
-            </Link>
-            <button
-              type="button"
-              onClick={(e) => handleCopyLinkUrl('/input-form', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Salin link publik form terjadwal"
-            >
-              {copiedLinkUrl === '/input-form' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
-            </button>
-          </div>
-
-          {/* Link Katalog IKU */}
-          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            <Link
-              href="/iku"
-              target="_blank"
-              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-              title="Buka katalog IKU publik tanpa login"
-            >
-              <ExternalLink size={11} className="text-indigo-500" />
-              <span>Katalog IKU</span>
-            </Link>
-            <button
-              type="button"
-              onClick={(e) => handleCopyLinkUrl('/iku', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Salin link publik katalog IKU"
-            >
-              {copiedLinkUrl === '/iku' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
-            </button>
-          </div>
-
-          {/* Link Portal Layanan Publik */}
-          <Link
-            href="/anggaran/layanan-publik"
-            className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-95 transition-all"
-            title="Buka Pusat Layanan Publik Terpadu"
-          >
-            <Sparkles size={12} />
-            <span>Portal Layanan</span>
-          </Link>
         </div>
       </div>
 
