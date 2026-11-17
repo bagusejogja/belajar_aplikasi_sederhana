@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import { requireMenuAccess } from '@/lib/serverAccess';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -62,6 +63,8 @@ Kembalikan JSON murni dengan struktur:
 Aturan: "soal_terdeteksi" hanya berisi soal yang MEMANG tertulis di dokumen (kosongkan [] bila dokumen hanya materi bacaan). Jangan mengarang soal di bagian ini.`;
 
 export async function POST(req: NextRequest) {
+  const denied = await requireMenuAccess(req, '/latihan-soal');
+  if (denied) return denied;
   try {
     const contentType = req.headers.get('content-type') || '';
 

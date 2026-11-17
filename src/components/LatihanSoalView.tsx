@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import PublicNavHeader from '@/components/PublicNavHeader';
+import { authFetch } from '@/lib/authFetch';
 import {
   BookOpen, UploadCloud, FileText, Sparkles, Loader2, Wand2, ListChecks, PlayCircle,
   Trophy, History, CheckCircle2, XCircle, MinusCircle, ChevronLeft, ChevronRight,
@@ -121,7 +121,7 @@ export default function LatihanSoalView() {
       const fd = new FormData();
       if (inputMode === 'file' && file) fd.append('file', file);
       else fd.append('text', pasted);
-      const res = await fetch('/api/latihan-soal', { method: 'POST', body: fd });
+      const res = await authFetch('/api/latihan-soal', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal membaca materi.');
       setMateri(data);
@@ -139,7 +139,7 @@ export default function LatihanSoalView() {
     setSolving(key);
     setError('');
     try {
-      const res = await fetch('/api/latihan-soal', {
+      const res = await authFetch('/api/latihan-soal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'solve', soal: teks, materi_teks: materi?.materi_teks || '' }),
@@ -159,7 +159,7 @@ export default function LatihanSoalView() {
     setError('');
     setLoading('AI sedang menyusun soal latihan...');
     try {
-      const res = await fetch('/api/latihan-soal', {
+      const res = await authFetch('/api/latihan-soal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generate', materi_teks: materi.materi_teks, jumlah, tingkat, komposisi, fokus }),
@@ -247,8 +247,7 @@ export default function LatihanSoalView() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <PublicNavHeader currentPath="/latihan-soal" title="Latihan Soal Interaktif (AI Quiz)" />
+    <div className="bg-slate-50 text-slate-800 rounded-3xl">
 
       <div className="mx-auto max-w-5xl px-3 py-5 sm:px-6">
         {/* Hero */}

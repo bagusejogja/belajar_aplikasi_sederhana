@@ -19,6 +19,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { menuList } from '@/lib/mock-db';
+import { getCachedAuthUser } from '@/lib/authCache';
+import { isPathAllowed } from '@/lib/menuAccess';
 import { supabase } from '@/lib/supabase';
 
 export interface CommandPaletteProps {
@@ -228,8 +230,19 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     }
   ];
 
+  // Hanya tampilkan item yang boleh diakses sesuai hak akses role (/menus)
+  const authUser = getCachedAuthUser();
+  const isAdminUser = ['admin', 'administrator'].includes((authUser?.role || '').toLowerCase());
+  const canOpen = (path?: string) => {
+    if (!path) return true;
+    if (isAdminUser) return true;
+    if (!authUser) return false;
+    return isPathAllowed(authUser.allowedPaths, path.split('?')[0]);
+  };
+
   // Filter items by search query and merge dynamic surat search results
   const staticFiltered = defaultItems.filter((item) => {
+    if (!canOpen(item.path)) return false;
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     return (

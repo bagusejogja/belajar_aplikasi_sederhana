@@ -10,6 +10,7 @@ import { menuList } from '@/lib/mock-db';
 import CommandPalette from '@/components/shared/CommandPalette';
 import ThemeToggle from '@/components/shared/ThemeToggle';
 import { fetchAuthUser, getCachedAuthUser, clearAuthCache } from '@/lib/authCache';
+import { isPathAllowed } from '@/lib/menuAccess';
 
 export default function DashboardLayout({
   children,
@@ -110,6 +111,7 @@ export default function DashboardLayout({
       case '/catatan-penelitian': return 'Input Pengeluaran Penelitian';
       case '/catatan-penelitian/laporan': return 'Laporan Pengeluaran Penelitian';
       case '/perubahan-rkat': return 'Cek Perubahan RKAT';
+      case '/latihan-soal': return 'Latihan Soal (AI Quiz)';
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }
   };
@@ -192,10 +194,7 @@ export default function DashboardLayout({
       setIsUnauthorized(false);
     } else if (cached) {
       // 3. Check allowed paths from cache
-      const isAllowed = cached.allowedPaths.some((p: string) => {
-        if (!p) return false;
-        return pathname === p || pathname.startsWith(p + '/');
-      });
+      const isAllowed = isPathAllowed(cached.allowedPaths, pathname);
       setIsUnauthorized(!isAllowed);
     }
 

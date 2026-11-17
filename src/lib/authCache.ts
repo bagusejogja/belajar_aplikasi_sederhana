@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { menuList } from '@/lib/mock-db';
+import { computeAllowedPaths } from '@/lib/menuAccess';
 
 export interface CachedAuthUser {
   userId: string;
@@ -59,17 +59,7 @@ export async function fetchAuthUser(forceRefresh = false): Promise<CachedAuthUse
         .eq('role', role);
       const dbPaths = (menuData || []).map((m: any) => m.path);
 
-      const roleLower = role.toLowerCase();
-      const presetPaths = (roleLower === 'admin' || roleLower === 'administrator')
-        ? menuList.map(m => m.path)
-        : menuList
-            .filter(item => {
-              const rolesLower = (item.roles || []).map(r => r.toLowerCase());
-              return rolesLower.includes(roleLower) || rolesLower.includes('all');
-            })
-            .map(item => item.path);
-
-      const finalAllowed = Array.from(new Set([...dbPaths, ...presetPaths]));
+      const finalAllowed = computeAllowedPaths(role, dbPaths);
 
       memoryAuthCache = {
         userId: session.user.id,
