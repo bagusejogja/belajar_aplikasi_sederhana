@@ -39,6 +39,7 @@ import {
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CatatanPenelitianTabs from '@/components/CatatanPenelitianTabs';
+import NotaKasbonModal from '@/components/NotaKasbonModal';
 import { getSafeFileUrl, getDownloadSafeFileUrl } from '@/lib/fileHelper';
 
 type AttachmentState = { files: File[]; url: string };
@@ -53,6 +54,8 @@ interface TransaksiPenelitian {
   catatan?: string | null;
   tipe_transaksi: string;
   status_kasbon: string;
+  notas?: any[];
+  nota_count?: number;
   nama_penerima?: string | null;
   nominal_kasbon?: number;
   nominal_realisasi?: number;
@@ -227,6 +230,24 @@ export default function LaporanCatatanPenelitianPage() {
     });
 
     return await Promise.all(uploadPromises);
+  };
+
+  // Buka kembali kasbon yang sudah ditutup (ada nota susulan)
+  const handleReopenKasbon = async (item: TransaksiPenelitian) => {
+    if (!confirm(`Buka kembali kasbon #${item.id} karena masih ada nota susulan?`)) return;
+    try {
+      const res = await fetch('/api/catatan-penelitian', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'buka_kembali', kasbon_id: item.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Gagal membuka kembali');
+      toast.success('Kasbon dibuka kembali. Silakan tambah nota susulan.');
+      fetchData();
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    }
   };
 
   // Open Modal Selesaikan Kasbon
@@ -486,10 +507,11 @@ export default function LaporanCatatanPenelitianPage() {
           'Penerima Kasbon / PIC': item.nama_penerima || '-',
           'Kategori': item.kategori,
           'Nominal Kasbon Awal': isKasbon ? kasbonVal : 0,
-          'Realisasi Belanja Riil': isKasbon ? (item.status_kasbon === 'Selesai' ? realisasiVal : 0) : item.nominal,
+          'Realisasi Belanja Riil': isKasbon ? ((item.status_kasbon === 'Selesai' || (item.nota_count || 0) > 0) ? realisasiVal : 0) : item.nominal,
+          'Jumlah Nota': isKasbon ? (item.nota_count || 0) : '',
           'Selisih Kasbon': isKasbon ? diffVal : 0,
-          'Keterangan Selisih': isKasbon && item.status_kasbon === 'Selesai' 
-            ? (diffVal > 0 ? `Sisa Kembali Rp ${diffVal.toLocaleString('id-ID')}` : diffVal < 0 ? `Kurang Bayar Rp ${Math.abs(diffVal).toLocaleString('id-ID')}` : 'Pas/Lunas')
+          'Keterangan Selisih': isKasbon && (item.status_kasbon === 'Selesai' || (item.nota_count || 0) > 0)
+            ? (item.status_kasbon === 'Selesai' ? '' : '(Sementara, kasbon masih terbuka) ') + (diffVal > 0 ? `Sisa Kembali Rp ${diffVal.toLocaleString('id-ID')}` : diffVal < 0 ? `Kurang Bayar Rp ${Math.abs(diffVal).toLocaleString('id-ID')}` : 'Pas/Lunas')
             : (isKasbon ? 'Belum Ada Nota' : '-'),
           'Tanggal Penyelesaian Nota': item.tanggal_penyelesaian || '-',
           'Uraian Rincian Kegiatan': item.uraian,
@@ -837,7 +859,7 @@ export default function LaporanCatatanPenelitianPage() {
                         {isWaiting ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
                             <Clock size={10} />
-                            <span>Kasbon: Menunggu Nota</span>
+                            <span>{(item.nota_count || 0) > 0 ? `Kasbon: Terbuka (${item.nota_count} nota, menunggu susulan)` : 'Kasbon: Menunggu Nota'}</span>
                           </span>
                         ) : isDone ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
@@ -882,6 +904,21 @@ export default function LaporanCatatanPenelitianPage() {
                             Penyelesaian: {item.catatan_penyelesaian}
                           </div>
                         )}
+                        {isKasbon && (item.notas || []).length > 0 && (
+                          <div className="mt-1.5 space-y-1 max-w-md">
+                            {(item.notas || []).map((n: any, ni: number) => (
+                              <div key={n.id} className="text-[10px] bg-blue-50/60 border border-blue-100 rounded-lg p-1.5">
+                                <div className="font-black text-blue-900 flex justify-between gap-2">
+                                  <span>Nota ke-{ni + 1} · {n.tanggal_nota}{n.toko ? ` · ${n.toko}` : ''}</span>
+                                  <span className="font-mono">{formatRupiah(n.total)}</span>
+                                </div>
+                                <div className="text-gray-600">
+                                  {(n.items || []).map((it: any) => `${it.nama} ${it.qty}${it.satuan ? ' ' + it.satuan : ''} × ${formatRupiah(it.harga)}`).join('; ')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
 
                       {/* Nominal / Kasbon */}
@@ -891,17 +928,17 @@ export default function LaporanCatatanPenelitianPage() {
                             <div className="text-xs font-black text-amber-900 font-mono">
                               Kasbon: {formatRupiah(item.nominal_kasbon || item.nominal)}
                             </div>
-                            {item.status_kasbon === 'Selesai' && (
+                            {(item.status_kasbon === 'Selesai' || (item.nota_count || 0) > 0) && (
                               <>
                                 <div className="text-[11px] font-black text-emerald-700 font-mono">
-                                  Belanja: {formatRupiah(item.nominal_realisasi || item.nominal)}
+                                  {item.status_kasbon === 'Selesai' ? 'Belanja' : 'Terpakai (sementara)'}: {formatRupiah(item.nominal_realisasi || item.nominal)}
                                 </div>
                                 {Number(item.selisih_kasbon || 0) !== 0 && (
                                   <div className={`text-[10px] font-black font-mono ${
                                     Number(item.selisih_kasbon) > 0 ? 'text-emerald-700' : 'text-rose-600'
                                   }`}>
                                     {Number(item.selisih_kasbon) > 0 
-                                      ? `Sisa: ${formatRupiah(item.selisih_kasbon || 0)}` 
+                                      ? `${item.status_kasbon === 'Selesai' ? 'Sisa' : 'Sisa sementara'}: ${formatRupiah(item.selisih_kasbon || 0)}` 
                                       : `Nombok: ${formatRupiah(Math.abs(item.selisih_kasbon || 0))}`}
                                   </div>
                                 )}
@@ -974,10 +1011,22 @@ export default function LaporanCatatanPenelitianPage() {
                               type="button"
                               onClick={() => handleOpenSettleModal(item)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer active:scale-95"
-                              title="Selesaikan kasbon dengan nota belanja"
+                              title="Tambah nota / rincian belanja (kasbon tetap terbuka sampai ditutup)"
                             >
                               <Receipt size={11} />
-                              <span>Selesaikan</span>
+                              <span>{(item.nota_count || 0) > 0 ? 'Tambah Nota' : 'Input Nota'}</span>
+                            </button>
+                          )}
+
+                          {isDone && (
+                            <button
+                              type="button"
+                              onClick={() => handleReopenKasbon(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                              title="Buka kembali karena masih ada nota susulan"
+                            >
+                              <RotateCcw size={11} />
+                              <span>Buka Kembali</span>
                             </button>
                           )}
 
@@ -1054,199 +1103,12 @@ export default function LaporanCatatanPenelitianPage() {
 
       </div>
 
-      {/* ========================================================== */}
-      {/* MODAL SELESAIKAN KASBON DARI LAPORAN                       */}
-      {/* ========================================================== */}
       {selectedKasbonToSettle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[92vh] overflow-y-auto flex flex-col p-6 sm:p-7 space-y-5">
-            
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
-                  <Receipt size={22} />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-gray-900">
-                    Penyelesaian Kasbon &amp; Realisasi Nota
-                  </h3>
-                  <p className="text-xs text-gray-500 font-medium">
-                    Kasbon #{selectedKasbonToSettle.id} ({selectedKasbonToSettle.nama_penerima || 'PIC'})
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedKasbonToSettle(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <span className="text-[10px] font-black uppercase text-gray-400 block">Penerima Kasbon</span>
-                  <span className="text-xs font-black text-gray-900">
-                    {selectedKasbonToSettle.nama_penerima || 'PIC Kegiatan'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase text-gray-400 block">Tanggal Kasbon</span>
-                  <span className="text-xs font-bold text-gray-700">
-                    {selectedKasbonToSettle.tanggal_transaksi}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-black uppercase text-amber-700 block">Uang Muka Kasbon</span>
-                  <span className="text-sm font-black text-amber-900 font-mono">
-                    {formatRupiah(modalKasbonAwal)}
-                  </span>
-                </div>
-              </div>
-              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-gray-600">
-                <span className="font-bold text-gray-700">Uraian Kasbon: </span>
-                <span>{selectedKasbonToSettle.uraian}</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSettleKasbonSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="space-y-1">
-                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                    <Calendar size={13} className="text-indigo-600" />
-                    <span>Tanggal Penyelesaian / Nota</span>
-                    <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={settleTanggal}
-                    onChange={(e) => setSettleTanggal(e.target.value)}
-                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <DollarSign size={13} className="text-emerald-600" />
-                      <span>Total Belanja Riil Nota (Rp)</span>
-                      <span className="text-rose-500">*</span>
-                    </span>
-                    {modalBelanjaRiil > 0 && (
-                      <span className="text-[11px] font-black text-emerald-700 font-mono">
-                        {formatRupiah(modalBelanjaRiil)}
-                      </span>
-                    )}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">Rp</span>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      step="any"
-                      value={settleNominalRealisasi}
-                      onChange={(e) => setSettleNominalRealisasi(e.target.value)}
-                      placeholder="0"
-                      className="w-full text-xs font-bold text-gray-900 border border-gray-200 rounded-xl pl-9 pr-3.5 py-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Kalkulator Selisih Visual */}
-              <div className={`p-4 rounded-2xl border transition-all ${
-                modalSelisih > 0 
-                  ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
-                  : modalSelisih < 0
-                  ? 'bg-amber-50/80 border-amber-300 text-amber-950'
-                  : 'bg-blue-50/80 border-blue-300 text-blue-950'
-              }`}>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5 font-black text-xs uppercase tracking-wider">
-                      {modalSelisih > 0 ? (
-                        <>
-                          <CheckCircle2 size={15} className="text-emerald-600" />
-                          <span>Status: Sisa Kasbon Lebih (Uang Dikembalikan)</span>
-                        </>
-                      ) : modalSelisih < 0 ? (
-                        <>
-                          <AlertTriangle size={15} className="text-amber-600" />
-                          <span>Status: Kurang Bayar (Reimbursement / Nombok)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check size={15} className="text-blue-600" />
-                          <span>Status: Pas / Selesai Sempurna</span>
-                        </>
-                      )}
-                    </div>
-                    <p className="text-[11px] opacity-80">
-                      {modalSelisih > 0 
-                        ? `Uang kasbon awal lebih besar dari belanja riil. Sisa ${formatRupiah(modalSelisih)} disetorkan kembali.`
-                        : modalSelisih < 0
-                        ? `Belanja riil melebihi kasbon. Kekurangan ${formatRupiah(Math.abs(modalSelisih))} diganti reimburse.`
-                        : 'Total belanja nota tepat sama dengan uang muka kasbon yang diberikan.'}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-[10px] font-black uppercase opacity-70 block">
-                      {modalSelisih >= 0 ? 'Sisa Dikembalikan' : 'Kurang Bayar'}
-                    </span>
-                    <span className="text-base font-black font-mono">
-                      {formatRupiah(Math.abs(modalSelisih))}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700">Catatan Penyelesaian Kasbon</label>
-                <input
-                  type="text"
-                  value={settleCatatan}
-                  onChange={(e) => setSettleCatatan(e.target.value)}
-                  placeholder="Contoh: Sisa kasbon sudah dikembalikan tunai ke bendahara..."
-                  className="w-full text-xs font-medium text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all placeholder:text-gray-400"
-                />
-              </div>
-
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedKasbonToSettle(null)}
-                  disabled={isSettling}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSettling}
-                  className="inline-flex items-center gap-1.5 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-2xl text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {isSettling ? (
-                    <>
-                      <RotateCcw size={13} className="animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={13} />
-                      <span>Simpan &amp; Selesaikan Kasbon</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <NotaKasbonModal
+          kasbon={selectedKasbonToSettle as any}
+          onClose={() => setSelectedKasbonToSettle(null)}
+          onSaved={() => { setSelectedKasbonToSettle(null); fetchData(); }}
+        />
       )}
 
       {/* ========================================================== */}
@@ -1439,12 +1301,32 @@ export default function LaporanCatatanPenelitianPage() {
             </div>
 
             <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
-              <img
-                src={previewPhotos[activePhotoIdx]}
-                alt="Bukti Lampiran"
-                className="max-h-full max-w-full object-contain"
-              />
+              {/\.pdf($|\?)/i.test(previewPhotos[activePhotoIdx]) ? (
+                <a
+                  href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-white text-slate-900 rounded-xl text-xs font-black"
+                >
+                  Buka File PDF
+                </a>
+              ) : (
+                <img
+                  key={previewPhotos[activePhotoIdx]}
+                  src={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+                  alt="Bukti Lampiran"
+                  className="max-h-full max-w-full object-contain"
+                />
+              )}
             </div>
+            <a
+              href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] font-bold text-indigo-600 hover:underline self-center"
+            >
+              Buka di tab baru
+            </a>
 
             {previewPhotos.length > 1 && (
               <div className="flex items-center justify-center gap-2 overflow-x-auto py-1">
@@ -1456,7 +1338,7 @@ export default function LaporanCatatanPenelitianPage() {
                       activePhotoIdx === i ? 'border-indigo-600 scale-105' : 'border-transparent opacity-60'
                     }`}
                   >
-                    <img src={url} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
+                    <img src={getSafeFileUrl(url)} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
