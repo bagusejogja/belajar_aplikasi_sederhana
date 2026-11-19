@@ -578,7 +578,9 @@ export default function CatatanPenelitianInputPage() {
                   onChange={(e) => setKategori(e.target.value)}
                   className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                 >
-                  <option value="Penelitian">Penelitian (Bahan, Analisis, Lab)</option>
+                  <option value="Penelitian">Penelitian (Umum / Analisis Lab)</option>
+                  <option value="Hewan & Bahan Penelitian">Hewan &amp; Bahan Penelitian (Kelinci, Tikus, Reagen, dll)</option>
+                  <option value="Perlengkapan Penelitian">Perlengkapan &amp; Alat Penelitian</option>
                   <option value="Pengabdian">Pengabdian Masyarakat</option>
                   <option value="Operasional Lab">Operasional Lab &amp; Fasilitas</option>
                   <option value="Perjalanan Dinas">Perjalanan Dinas / Transportasi</option>

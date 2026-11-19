@@ -705,12 +705,15 @@ export default function LaporanCatatanPenelitianPage() {
               className="h-10 px-3 bg-gray-50/70 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
             >
               <option value="ALL">Semua Kategori</option>
-              <option value="Penelitian">Penelitian</option>
+              <option value="Penelitian">Penelitian (Umum)</option>
+              <option value="Hewan & Bahan Penelitian">Hewan &amp; Bahan Penelitian (Kelinci, dll)</option>
+              <option value="Perlengkapan Penelitian">Perlengkapan &amp; Alat Penelitian</option>
               <option value="Pengabdian">Pengabdian</option>
               <option value="Operasional Lab">Operasional Lab</option>
               <option value="Perjalanan Dinas">Perjalanan Dinas</option>
               <option value="Konsumsi & Rapat">Konsumsi &amp; Rapat</option>
               <option value="Jasa & Honor">Jasa &amp; Honor</option>
+              <option value="Lainnya">Lainnya</option>
             </select>
 
             <button
@@ -1261,12 +1264,15 @@ export default function LaporanCatatanPenelitianPage() {
                     onChange={(e) => setEditKategori(e.target.value)}
                     className="w-full text-xs font-bold border border-gray-200 rounded-xl p-2.5"
                   >
-                    <option value="Penelitian">Penelitian</option>
+                    <option value="Penelitian">Penelitian (Umum)</option>
+                    <option value="Hewan & Bahan Penelitian">Hewan &amp; Bahan Penelitian (Kelinci, dll)</option>
+                    <option value="Perlengkapan Penelitian">Perlengkapan &amp; Alat Penelitian</option>
                     <option value="Pengabdian">Pengabdian</option>
                     <option value="Operasional Lab">Operasional Lab</option>
                     <option value="Perjalanan Dinas">Perjalanan Dinas</option>
                     <option value="Konsumsi & Rapat">Konsumsi &amp; Rapat</option>
                     <option value="Jasa & Honor">Jasa &amp; Honor</option>
+                    <option value="Lainnya">Lainnya</option>
                   </select>
                 </div>
               </div>
