@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     } = body;
 
     // ===== Aksi Nota Bertahap (kasbon bisa punya banyak nota) =====
-    if (action === 'tambah_nota' || action === 'tutup_kasbon' || action === 'buka_kembali' || action === 'hapus_nota') {
+    if (action === 'tambah_nota' || action === 'update_nota' || action === 'tutup_kasbon' || action === 'buka_kembali' || action === 'hapus_nota') {
       const joinUrls = (a?: string | null, b?: string | null) =>
         [a, b].filter((x) => x && String(x).trim()).join(', ') || null;
 
@@ -227,6 +227,42 @@ export async function POST(request: Request) {
           }
           throw insErr;
         }
+        if (body.foto_nota) parentUpdate.foto_bukti_1 = joinUrls(parent.foto_bukti_1, body.foto_nota);
+        if (body.foto_barang) parentUpdate.foto_bukti_3 = joinUrls(parent.foto_bukti_3, body.foto_barang);
+      }
+
+      if (action === 'update_nota') {
+        if (!body.nota_id) return NextResponse.json({ success: false, error: 'nota_id wajib untuk update nota' }, { status: 400 });
+        const rows = Array.isArray(body.items) ? body.items : [];
+        const cleanItems = rows
+          .map((r: any) => ({
+            nama: String(r.nama || '').trim(),
+            qty: Number(r.qty) || 0,
+            satuan: String(r.satuan || '').trim(),
+            harga: Number(r.harga) || 0,
+          }))
+          .filter((r: any) => r.nama && r.qty > 0);
+        const total = cleanItems.reduce((s: number, r: any) => s + r.qty * r.harga, 0);
+        if (cleanItems.length === 0 || total <= 0) {
+          return NextResponse.json({ success: false, error: 'Isi minimal satu rincian barang dengan volume & harga' }, { status: 400 });
+        }
+
+        const notaUpdate: any = {
+          tanggal_nota: body.tanggal_nota || new Date().toISOString().split('T')[0],
+          toko: body.toko ? String(body.toko).trim() : null,
+          keterangan: body.keterangan ? String(body.keterangan).trim() : null,
+          items: cleanItems,
+          total,
+        };
+        if (body.foto_nota !== undefined) notaUpdate.foto_nota = body.foto_nota || null;
+        if (body.foto_barang !== undefined) notaUpdate.foto_barang = body.foto_barang || null;
+
+        const { error: updNotaErr } = await supabaseAdmin
+          .from('catatan_penelitian_nota')
+          .update(notaUpdate)
+          .eq('id', body.nota_id);
+        if (updNotaErr) throw updNotaErr;
+
         if (body.foto_nota) parentUpdate.foto_bukti_1 = joinUrls(parent.foto_bukti_1, body.foto_nota);
         if (body.foto_barang) parentUpdate.foto_bukti_3 = joinUrls(parent.foto_bukti_3, body.foto_barang);
       }
