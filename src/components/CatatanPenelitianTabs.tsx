@@ -65,6 +65,18 @@ export default function CatatanPenelitianTabs() {
           <BarChart3 size={15} />
           <span>Laporan &amp; Monitoring Kasbon</span>
         </Link>
+
+        <Link
+          href="/catatan-penelitian/mutasi"
+          className={`flex items-center gap-2 px-4 py-2.5 border-b-2 text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            pathname.startsWith('/catatan-penelitian/mutasi')
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-t-xl'
+              : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-100 hover:border-gray-300'
+          }`}
+        >
+          <Wallet size={15} />
+          <span>Mutasi Kas &amp; Rekap PIC</span>
+        </Link>
       </div>
     </div>
   );
