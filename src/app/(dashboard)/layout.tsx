@@ -90,12 +90,12 @@ export default function DashboardLayout({
       case '/gov-narrative': return 'Narrative Generator';
       case '/surat/convert-ai': return 'AI Convert Surat';
       case '/potret-mutasi-pagu': return 'Potret Mutasi Pagu Keseluruhan';
-      case '/tambah-pagu/komparasi': return 'Komparasi Audit Tambah Pagu';
-      case '/tambah-pagu/tambah': return 'Input Tambah Pagu Manual';
-      case '/tambah-pagu': return 'Dashboard Pagu & Mutasi';
-      case '/analisis': return 'Analisis Usulan Tambah Pagu';
-      case '/copas-pagu': return 'Sinkronisasi Pagu Finance';
-      case '/anggaran/mak': return 'Koreksi & Verifikasi MAK';
+      case '/tambah-pagu/komparasi': return 'Perbandingan data Finance';
+      case '/tambah-pagu/tambah': return 'Input Tambah Pagu';
+      case '/tambah-pagu': return 'Dashboard Tambah Pagu';
+      case '/analisis': return 'Anilisis Tambah Pagu';
+      case '/copas-pagu': return 'Input Mutasi Pagu dr FInanace';
+      case '/anggaran/mak': return 'Portal Layanan Publik';
       case '/input-rkat': return 'Pengajuan Perubahan RKAT';
       case '/pengajuan-rkat': return 'Pengajuan Perubahan RKAT';
       case '/layanan-publik': return 'Portal Layanan Publik (Form & IKU)';

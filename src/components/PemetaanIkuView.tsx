@@ -233,22 +233,27 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     }, 5000);
   };
 
-  // Cek apakah pengguna sedang login (Mode Login Dashboard vs Publik Tanpa Login)
+  // Cek apakah pengguna sedang di dashboard login (halaman http://localhost:3000/iku tanpa header tidak menampilkan Tambah/Edit)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setIsLoggedIn(!!data.session);
     });
   }, []);
-  const canManageActivities = hideHeader || isLoggedIn;
+  // Tombol Tambah Kegiatan dan Edit HANYA tampil di dalam dashboard (/anggaran/mak?tab=katalog-iku)
+  // Di halaman publik /iku (hideHeader === false), tombol ini tidak ditampilkan sama sekali
+  const canManageActivities = Boolean(hideHeader);
 
   // State Modal Tambah & Edit Kegiatan
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<IkuItem | null>(null);
   const [formNamaKegiatan, setFormNamaKegiatan] = useState('');
   const [formKodeKegiatan, setFormKodeKegiatan] = useState('');
+  const [formKodeProgram, setFormKodeProgram] = useState('');
   const [formNamaProgram, setFormNamaProgram] = useState('');
+  const [formKodeSasaran, setFormKodeSasaran] = useState('');
   const [formNamaSasaran, setFormNamaSasaran] = useState('');
+  const [formKodeTujuan, setFormKodeTujuan] = useState('');
   const [formNamaTujuan, setFormNamaTujuan] = useState('');
   const [formTargetIku, setFormTargetIku] = useState('Belum Ada IKU');
   const [formTahun, setFormTahun] = useState('2026');
@@ -258,8 +263,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     setEditingActivity(null);
     setFormNamaKegiatan('');
     setFormKodeKegiatan('');
+    setFormKodeProgram('');
     setFormNamaProgram('');
+    setFormKodeSasaran('');
     setFormNamaSasaran('');
+    setFormKodeTujuan('');
     setFormNamaTujuan('');
     setFormTargetIku(selectedRef !== 'ALL' ? selectedRef : (masters[0]?.nama_ref_iku || 'Belum Ada IKU'));
     setFormTahun(selectedTahun !== 'all' ? selectedTahun : '2026');
@@ -270,8 +278,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     setEditingActivity(item);
     setFormNamaKegiatan(item.kegiatan_nama || '');
     setFormKodeKegiatan(item.kegiatan_kode || '');
+    setFormKodeProgram(item.program_kode || '');
     setFormNamaProgram(item.program_nama || '');
+    setFormKodeSasaran(item.sasaran_kode || '');
     setFormNamaSasaran(item.sasaran_nama || '');
+    setFormKodeTujuan(item.tujuan_kode || '');
     setFormNamaTujuan(item.tujuan_nama || '');
     setFormTargetIku(item.ref_iku || 'Belum Ada IKU');
     setFormTahun(String(item.ref_tahun_iku || 2026));
@@ -296,8 +307,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
           kegiatan_nama: formNamaKegiatan.trim(),
           kegiatan_kode: formKodeKegiatan.trim(),
           program_nama: formNamaProgram.trim(),
+          program_kode: formKodeProgram.trim(),
           sasaran_nama: formNamaSasaran.trim(),
+          sasaran_kode: formKodeSasaran.trim(),
           tujuan_nama: formNamaTujuan.trim(),
+          tujuan_kode: formKodeTujuan.trim(),
           ref_iku: formTargetIku,
           ref_tahun_iku: Number(formTahun) || 2026
         })
@@ -635,133 +649,274 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     return sorted.filter(m => m.nama_ref_iku.toLowerCase().includes(q));
   }, [masters, moveSearchText]);
 
-  // POIN 5: Ekspor Excel Khusus 1 IKU
-  const handleExportExcelGroup = async (group: IkuGroup) => {
-    const workbook = new ExcelJS.Workbook();
-    const cleanSheetName = (group.ref_iku.slice(0, 28) || 'IKU').replace(/[*?:/\\\[\]]/g, '_');
-    const sheet = workbook.addWorksheet(cleanSheetName);
-
-    sheet.columns = [
-      { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Kunci', key: 'status_kunci', width: 18 },
-      { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
-      { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
-      { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
-      { header: 'Nama Tujuan', key: 'tujuan_nama', width: 35 },
-      { header: 'Kode Indikator Tujuan', key: 'indikator_tujuan_kode', width: 14 },
-      { header: 'Indikator Tujuan', key: 'indikator_tujuan_nama', width: 35 },
-      { header: 'Kode Sasaran', key: 'sasaran_kode', width: 14 },
-      { header: 'Nama Sasaran', key: 'sasaran_nama', width: 35 },
-      { header: 'Kode Indikator Sasaran', key: 'indikator_sasaran_kode', width: 14 },
-      { header: 'Indikator Sasaran', key: 'indikator_sasaran_nama', width: 35 },
-      { header: 'Kode Program', key: 'program_kode', width: 16 },
-      { header: 'Nama Program', key: 'program_nama', width: 35 },
-      { header: 'Kode Indikator Program', key: 'indikator_program_kode', width: 14 },
-      { header: 'Indikator Program', key: 'indikator_program_nama', width: 35 },
-      { header: 'Kode Kegiatan (RKAT)', key: 'kegiatan_kode', width: 18 },
-      { header: 'Nama Kegiatan (RKAT)', key: 'kegiatan_nama', width: 40 },
-    ];
-
-    const headerRow = sheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1E3A8A' }
-    };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
-    group.items.forEach((item, idx) => {
-      sheet.addRow({
-        no: idx + 1,
-        status_kunci: lockedItemIds[item.id] ? 'Terkunci (IKU Sudah Dipetakan)' : 'Belum Dikunci',
-        ref_tahun_iku: item.ref_tahun_iku,
-        ref_iku: item.ref_iku,
-        tujuan_kode: item.tujuan_kode,
-        tujuan_nama: item.tujuan_nama,
-        indikator_tujuan_kode: item.indikator_tujuan_kode,
-        indikator_tujuan_nama: item.indikator_tujuan_nama,
-        sasaran_kode: item.sasaran_kode,
-        sasaran_nama: item.sasaran_nama,
-        indikator_sasaran_kode: item.indikator_sasaran_kode,
-        indikator_sasaran_nama: item.indikator_sasaran_nama,
-        program_kode: item.program_kode,
-        program_nama: item.program_nama,
-        indikator_program_kode: item.indikator_program_kode,
-        indikator_program_nama: item.indikator_program_nama,
-        kegiatan_kode: item.kegiatan_kode,
-        kegiatan_nama: item.kegiatan_nama,
-      });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const cleanFileName = group.ref_iku.slice(0, 25).replace(/[^a-zA-Z0-9]/g, '_');
-    a.download = `Pemetaan_${cleanFileName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    showToast(`File Excel khusus "${group.ref_iku.slice(0, 30)}..." berhasil diunduh.`, 'success');
-  };
-
-  // Ekspor Excel Global
+  // Ekspor Excel Multi-Sheet Per IKU (Sesuai Filter Aktif) dengan Desain Menarik & Profesional
   const handleExportExcelAll = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet(`Pemetaan IKU ${selectedTahun}`);
+    if (allFlattenedItems.length === 0) {
+      showToast('Tidak ada data yang dapat diekspor sesuai filter saat ini.', 'error');
+      return;
+    }
 
-    sheet.columns = [
-      { header: 'No', key: 'no', width: 6 },
-      { header: 'Status Kunci', key: 'status_kunci', width: 18 },
-      { header: 'Tahun IKU', key: 'ref_tahun_iku', width: 12 },
-      { header: 'Referensi IKU', key: 'ref_iku', width: 45 },
-      { header: 'Kode Tujuan', key: 'tujuan_kode', width: 12 },
-      { header: 'Nama Tujuan', key: 'tujuan_nama', width: 35 },
-      { header: 'Kode Indikator Tujuan', key: 'indikator_tujuan_kode', width: 14 },
-      { header: 'Indikator Tujuan', key: 'indikator_tujuan_nama', width: 35 },
-      { header: 'Kode Sasaran', key: 'sasaran_kode', width: 14 },
-      { header: 'Nama Sasaran', key: 'sasaran_nama', width: 35 },
-      { header: 'Kode Indikator Sasaran', key: 'indikator_sasaran_kode', width: 14 },
-      { header: 'Indikator Sasaran', key: 'indikator_sasaran_nama', width: 35 },
-      { header: 'Kode Program', key: 'program_kode', width: 16 },
-      { header: 'Nama Program', key: 'program_nama', width: 35 },
-      { header: 'Kode Indikator Program', key: 'indikator_program_kode', width: 14 },
-      { header: 'Indikator Program', key: 'indikator_program_nama', width: 35 },
-      { header: 'Kode Kegiatan (RKAT)', key: 'kegiatan_kode', width: 18 },
-      { header: 'Nama Kegiatan (RKAT)', key: 'kegiatan_nama', width: 40 },
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Portal Keuangan UGM';
+    workbook.lastModifiedBy = 'Sistem Pemetaan IKU';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    // 1. SHEET REKAPITULASI (Ringkasan Seluruh IKU yang lolos filter)
+    const summarySheet = workbook.addWorksheet('Ringkasan Rekapitulasi', {
+      views: [{ showGridLines: true }]
+    });
+
+    // Judul & Filter Header
+    summarySheet.mergeCells('A1:G1');
+    const titleCell = summarySheet.getCell('A1');
+    titleCell.value = 'LAPORAN REKAPITULASI PEMETAAN REFERENSI IKU';
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } };
+    titleCell.alignment = { vertical: 'middle' };
+
+    summarySheet.mergeCells('A2:G2');
+    const subtitleCell = summarySheet.getCell('A2');
+    const filterInfo = [
+      `Tahun: ${selectedTahun === 'all' ? 'Semua Tahun' : selectedTahun}`,
+      selectedRef !== 'ALL' ? `IKU: ${selectedRef}` : null,
+      searchQuery ? `Pencarian: "${searchQuery}"` : null,
+      `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    ].filter(Boolean).join(' | ');
+    subtitleCell.value = filterInfo;
+    subtitleCell.font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+    subtitleCell.alignment = { vertical: 'middle' };
+
+    summarySheet.addRow([]); // Blank row 3
+
+    // Kolom Ringkasan
+    summarySheet.getRow(4).values = [
+      'No',
+      'Tahun',
+      'Referensi Indikator Kinerja Utama (IKU)',
+      'Total Kegiatan RKAT',
+      'Sudah Dikunci',
+      'Belum Dikunci',
+      'Progres Pemetaan'
     ];
 
-    const headerRow = sheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
+    const sumHeaderRow = summarySheet.getRow(4);
+    sumHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    sumHeaderRow.fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF1E3A8A' }
     };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    sumHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    sumHeaderRow.height = 24;
 
-    let counter = 1;
-    allFlattenedItems.forEach(item => {
-      sheet.addRow({
-        no: counter++,
-        status_kunci: lockedItemIds[item.id] ? 'Terkunci (IKU Sudah Dipetakan)' : 'Belum Dikunci',
-        ref_tahun_iku: item.ref_tahun_iku,
-        ref_iku: item.ref_iku,
-        tujuan_kode: item.tujuan_kode,
-        tujuan_nama: item.tujuan_nama,
-        indikator_tujuan_kode: item.indikator_tujuan_kode,
-        indikator_tujuan_nama: item.indikator_tujuan_nama,
-        sasaran_kode: item.sasaran_kode,
-        sasaran_nama: item.sasaran_nama,
-        indikator_sasaran_kode: item.indikator_sasaran_kode,
-        indikator_sasaran_nama: item.indikator_sasaran_nama,
-        program_kode: item.program_kode,
-        program_nama: item.program_nama,
-        indikator_program_kode: item.indikator_program_kode,
-        indikator_program_nama: item.indikator_program_nama,
-        kegiatan_kode: item.kegiatan_kode,
-        kegiatan_nama: item.kegiatan_nama,
+    summarySheet.columns = [
+      { key: 'no', width: 6 },
+      { key: 'tahun', width: 10 },
+      { key: 'ref_iku', width: 50 },
+      { key: 'total', width: 20 },
+      { key: 'locked', width: 16 },
+      { key: 'unlocked', width: 16 },
+      { key: 'pct', width: 18 },
+    ];
+
+    const activeGroupsWithData = groups.filter(g => g.items.length > 0);
+    let totalAllKegiatan = 0;
+    let totalAllLocked = 0;
+
+    activeGroupsWithData.forEach((g, idx) => {
+      const lockedCount = g.items.filter(it => lockedItemIds[it.id]).length;
+      const unLockedCount = g.items.length - lockedCount;
+      const pct = g.items.length > 0 ? Math.round((lockedCount / g.items.length) * 100) : 0;
+      totalAllKegiatan += g.items.length;
+      totalAllLocked += lockedCount;
+
+      const row = summarySheet.addRow([
+        idx + 1,
+        g.ref_tahun_iku,
+        g.ref_iku,
+        g.items.length,
+        lockedCount,
+        unLockedCount,
+        `${pct}%`
+      ]);
+
+      const isEven = idx % 2 === 1;
+      row.height = 20;
+      row.font = { size: 9 };
+      row.alignment = { vertical: 'middle' };
+      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      row.eachCell((cell) => {
+        if (isEven) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8FAFC' }
+          };
+        }
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+      });
+    });
+
+    // Total Row di Sheet Summary
+    const totalRow = summarySheet.addRow([
+      'TOTAL',
+      '',
+      `${activeGroupsWithData.length} Kelompok IKU`,
+      totalAllKegiatan,
+      totalAllLocked,
+      totalAllKegiatan - totalAllLocked,
+      `${totalAllKegiatan > 0 ? Math.round((totalAllLocked / totalAllKegiatan) * 100) : 0}%`
+    ]);
+    totalRow.height = 22;
+    totalRow.font = { bold: true, size: 9, color: { argb: 'FF1E293B' } };
+    totalRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF1F5F9' }
+    };
+    totalRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
+    totalRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'medium', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+    });
+
+    // 2. SHEET PER IKU
+    const usedSheetNames = new Set<string>(['Ringkasan Rekapitulasi']);
+
+    activeGroupsWithData.forEach((g) => {
+      // Buat nama sheet yang valid di Excel (maks 31 char, tanpa char terlarang)
+      let rawName = g.ref_iku.replace(/[*?:/\\\[\]]/g, '').trim();
+      const match = rawName.match(/^(IKU\s*[0-9A-Za-z.-]+)/i);
+      let shortName = match ? match[1] : (rawName.slice(0, 25) || 'IKU');
+      if (rawName === 'Belum Ada IKU') shortName = 'Belum Ada IKU';
+
+      let sheetName = shortName.slice(0, 30);
+      let dupCounter = 2;
+      while (usedSheetNames.has(sheetName)) {
+        sheetName = `${shortName.slice(0, 26)} (${dupCounter})`;
+        dupCounter++;
+      }
+      usedSheetNames.add(sheetName);
+
+      const sheet = workbook.addWorksheet(sheetName, {
+        views: [{ showGridLines: true }]
+      });
+
+      // Baris 1: Judul IKU
+      sheet.mergeCells('A1:J1');
+      const headerCell = sheet.getCell('A1');
+      headerCell.value = `REFERENSI: ${g.ref_iku} (TA ${g.ref_tahun_iku})`;
+      headerCell.font = { bold: true, size: 12, color: { argb: 'FF1E3A8A' } };
+      headerCell.alignment = { vertical: 'middle' };
+
+      // Baris 2: Keterangan / Uraian
+      sheet.mergeCells('A2:J2');
+      const descCell = sheet.getCell('A2');
+      descCell.value = g.uraian 
+        ? `Uraian Indikator: ${g.uraian} | Total: ${g.items.length} Kegiatan RKAT` 
+        : `Total: ${g.items.length} Kegiatan RKAT`;
+      descCell.font = { italic: true, size: 9, color: { argb: 'FF475569' } };
+      descCell.alignment = { vertical: 'middle' };
+
+      sheet.addRow([]); // Blank row 3
+
+      // Header Tabel Baris 4
+      sheet.getRow(4).values = [
+        'No',
+        'Status Kunci',
+        'Kode Kegiatan',
+        'Nama Kegiatan (RKAT)',
+        'Kode Program',
+        'Nama Program',
+        'Kode Sasaran',
+        'Nama Sasaran',
+        'Kode Tujuan',
+        'Nama Tujuan'
+      ];
+
+      const dataHeaderRow = sheet.getRow(4);
+      dataHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9.5 };
+      dataHeaderRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: g.ref_iku === 'Belum Ada IKU' ? 'FFB45309' : 'FF1E3A8A' }
+      };
+      dataHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      dataHeaderRow.height = 24;
+
+      sheet.columns = [
+        { key: 'no', width: 6 },
+        { key: 'status', width: 15 },
+        { key: 'kegiatan_kode', width: 16 },
+        { key: 'kegiatan_nama', width: 44 },
+        { key: 'program_kode', width: 14 },
+        { key: 'program_nama', width: 30 },
+        { key: 'sasaran_kode', width: 14 },
+        { key: 'sasaran_nama', width: 30 },
+        { key: 'tujuan_kode', width: 14 },
+        { key: 'tujuan_nama', width: 30 },
+      ];
+
+      g.items.forEach((item, itemIdx) => {
+        const isLocked = lockedItemIds[item.id];
+        const row = sheet.addRow([
+          itemIdx + 1,
+          isLocked ? '🔒 Terkunci' : 'Belum Dikunci',
+          item.kegiatan_kode || '-',
+          item.kegiatan_nama || '-',
+          item.program_kode || '-',
+          item.program_nama || '-',
+          item.sasaran_kode || '-',
+          item.sasaran_nama || '-',
+          item.tujuan_kode || '-',
+          item.tujuan_nama || '-'
+        ]);
+
+        const isRowEven = itemIdx % 2 === 1;
+        row.height = 20;
+        row.font = { size: 9 };
+        row.alignment = { vertical: 'middle' };
+        row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(9).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        row.eachCell((cell) => {
+          if (isRowEven) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFF8FAFC' }
+            };
+          }
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+          };
+        });
       });
     });
 
@@ -770,10 +925,11 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Pemetaan_IKU_${selectedTahun}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filterSuffix = selectedRef !== 'ALL' ? `_${selectedRef.slice(0, 15).replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+    a.download = `Pemetaan_IKU_${selectedTahun}${filterSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     window.URL.revokeObjectURL(url);
-    showToast(`Seluruh data pemetaan (${allFlattenedItems.length} kegiatan) berhasil diunduh.`, 'success');
+    showToast(`File Excel pemetaan (${allFlattenedItems.length} kegiatan pada ${activeGroupsWithData.length} Sheet IKU) berhasil diunduh.`, 'success');
   };
 
   return (
@@ -834,16 +990,16 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                 <span>{showChart ? 'Tutup Grafik Pie' : 'Buka Grafik Pie'}</span>
               </button>
 
-              {/* Tombol Unduh Excel Seluruh Data */}
+              {/* Tombol Unduh Excel Hasil Filter / Seluruh Data (Multi-Sheet Per IKU) */}
               <button
                 type="button"
                 onClick={handleExportExcelAll}
                 disabled={loading || allFlattenedItems.length === 0}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-lg shadow-emerald-900/30 transition-all cursor-pointer disabled:opacity-50"
-                title="Unduh seluruh hasil pemetaan aktif ke file Excel"
+                title="Unduh hasil pemetaan aktif ke file Excel (Multi-Sheet per IKU & Ringkasan Rekapitulasi)"
               >
                 <Download size={14} />
-                <span>Unduh Semua ({allFlattenedItems.length})</span>
+                <span>Unduh Excel ({allFlattenedItems.length})</span>
               </button>
 
               {/* Tombol Tambah Kegiatan Baru (Hanya untuk Pengguna Login) */}
@@ -1527,23 +1683,7 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                         </div>
                       </div>
 
-                      <div className="shrink-0 flex items-center gap-2">
-                        {/* POIN 5: Tombol Unduh Excel per IKU */}
-                        {group.count > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleExportExcelGroup(group);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 active:scale-95 text-emerald-700 border border-emerald-200 hover:border-emerald-300 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                            title={`Unduh file Excel khusus untuk: ${group.ref_iku}`}
-                          >
-                            <Download size={13} />
-                            <span className="hidden sm:inline">Unduh Excel IKU Ini</span>
-                          </button>
-                        )}
-
+                      <div className="shrink-0 flex items-center">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
                           isExpanded 
                             ? (isUnmapped ? 'bg-amber-600 text-white rotate-180' : 'bg-blue-600 text-white rotate-180') 
@@ -2596,22 +2736,52 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                 {/* Hirarki Tambahan: Program, Sasaran, Tujuan */}
                 <div className="pt-2 border-t border-slate-100 space-y-3">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Hirarki Perencanaan (Opsional)
+                    Hirarki Perencanaan Sesuai Kolom Database (Opsional)
                   </span>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Nama Program
-                    </label>
-                    <input
-                      type="text"
-                      value={formNamaProgram}
-                      onChange={(e) => setFormNamaProgram(e.target.value)}
-                      placeholder="Contoh: Program Peningkatan Mutu Akademik"
-                      className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                    />
+                  
+                  {/* Program: Kode & Nama */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Kode Program
+                      </label>
+                      <input
+                        type="text"
+                        value={formKodeProgram}
+                        onChange={(e) => setFormKodeProgram(e.target.value)}
+                        placeholder="Contoh: 1.01"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Nama Program
+                      </label>
+                      <input
+                        type="text"
+                        value={formNamaProgram}
+                        onChange={(e) => setFormNamaProgram(e.target.value)}
+                        placeholder="Contoh: Program Peningkatan Mutu Akademik"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
+
+                  {/* Sasaran: Kode & Nama */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Kode Sasaran
+                      </label>
+                      <input
+                        type="text"
+                        value={formKodeSasaran}
+                        onChange={(e) => setFormKodeSasaran(e.target.value)}
+                        placeholder="Contoh: SS.01"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Nama Sasaran
                       </label>
@@ -2623,7 +2793,23 @@ export default function PemetaanIkuView({ hideHeader = false }: { hideHeader?: b
                         className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
-                    <div>
+                  </div>
+
+                  {/* Tujuan: Kode & Nama */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Kode Tujuan
+                      </label>
+                      <input
+                        type="text"
+                        value={formKodeTujuan}
+                        onChange={(e) => setFormKodeTujuan(e.target.value)}
+                        placeholder="Contoh: TJ.01"
+                        className="w-full text-xs font-medium text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Nama Tujuan
                       </label>

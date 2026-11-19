@@ -22,15 +22,22 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   {
+    id: 'tambah',
+    title: 'Input Tambah Pagu',
+    path: '/tambah-pagu/tambah',
+    icon: PlusCircle,
+    badge: 'Form Manual',
+  },
+  {
     id: 'daftar',
-    title: 'Dashboard Pagu & Mutasi',
+    title: 'Dashboard Tambah Pagu',
     path: '/tambah-pagu',
     icon: Layout,
     badge: 'Monitoring Pagu',
   },
   {
     id: 'analisis',
-    title: 'Analisis Usulan Pagu',
+    title: 'Anilisis Tambah Pagu',
     path: '/analisis',
     icon: FileSpreadsheet,
     badge: 'Telaah Usulan',
@@ -44,14 +51,14 @@ const TABS: TabConfig[] = [
   },
   {
     id: 'copas',
-    title: 'Sinkronisasi Pagu Finance',
+    title: 'Input Mutasi Pagu dr FInanace',
     path: '/copas-pagu',
     icon: ClipboardPaste,
     badge: 'Copas Finance',
   },
   {
     id: 'komparasi',
-    title: 'Perbandingan Finance',
+    title: 'Perbandingan data Finance',
     path: '/tambah-pagu/komparasi',
     icon: Scale,
     badge: 'Audit Versi',
@@ -62,13 +69,6 @@ const TABS: TabConfig[] = [
     path: '/potret-mutasi-pagu',
     icon: PieChart,
     badge: 'Potret Keseluruhan',
-  },
-  {
-    id: 'tambah',
-    title: 'Input Tambah Pagu',
-    path: '/tambah-pagu/tambah',
-    icon: PlusCircle,
-    badge: 'Form Manual',
   },
 ];
 

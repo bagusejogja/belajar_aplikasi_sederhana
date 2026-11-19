@@ -92,12 +92,12 @@ export const menuList: MenuItem[] = [
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN & RKAT ---
-  { title: 'Portal Layanan Publik (Form & IKU)', path: '/anggaran/layanan-publik', icon: 'Sparkles', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran', 'GUEST'], group: 'Anggaran & RKAT' },
+  { title: 'Portal Layanan Publik (Form & IKU)', path: '/anggaran/layanan-publik', icon: 'Sparkles', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran', 'GUEST'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
   { title: 'Dashboard Pagu & Mutasi', path: '/tambah-pagu', icon: 'PieChart', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
   { title: 'Analisis Usulan Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
   { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'TrendingUp', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
   { title: 'Sinkronisasi Pagu Finance', path: '/copas-pagu', icon: 'Database', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
-  { title: 'Rekapitulasi Revisi (MAK, RKAT, Terjadwal)', path: '/anggaran/mak', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Portal Layanan Publik', path: '/anggaran/mak', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
   { title: 'Pengajuan Perubahan RKAT', path: '/input-rkat', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
   { title: 'Katalog & Pemetaan IKU', path: '/iku', icon: 'Target', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
   { title: 'Pengajuan Revisi MAK Unit', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT', hiddenInSidebar: true },

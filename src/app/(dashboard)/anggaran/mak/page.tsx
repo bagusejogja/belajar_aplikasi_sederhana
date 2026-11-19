@@ -865,7 +865,7 @@ export default function MonitoringMakPage() {
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
       {/* 🔴 MODUL SUITE: REKAP LAYANAN ANGGARAN & IKU (STANDAR DESIGN SYSTEM) */}
       <div className="bg-white/95 backdrop-blur-sm p-3 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-xs space-y-3">
-        {/* Top Header Label & Akses Cepat */}
+        {/* Top Header Label */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-700">
@@ -877,99 +877,6 @@ export default function MonitoringMakPage() {
             <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
               • Revisi MAK, Perubahan RKAT, Revisi Terjadwal, &amp; Katalog IKU
             </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mr-1 hidden sm:inline">Form Publik:</span>
-            {/* Quick Links cleanly styled */}
-            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
-              <Link
-                href="/input-mak"
-                target="_blank"
-                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-rose-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-                title="Buka form input MAK tanpa login"
-              >
-                <ExternalLink size={10} className="text-rose-500" />
-                <span>Form MAK</span>
-              </Link>
-              <button
-                type="button"
-                onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
-                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Salin tautan form MAK"
-              >
-                {copiedLinkUrl === '/input-mak' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
-              </button>
-            </div>
-
-            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
-              <Link
-                href="/input-rkat"
-                target="_blank"
-                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-blue-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-                title="Buka form input RKAT tanpa login"
-              >
-                <ExternalLink size={10} className="text-blue-500" />
-                <span>Form RKAT</span>
-              </Link>
-              <button
-                type="button"
-                onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
-                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Salin tautan form RKAT"
-              >
-                {copiedLinkUrl === '/input-rkat' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
-              </button>
-            </div>
-
-            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
-              <Link
-                href="/input-form"
-                target="_blank"
-                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-emerald-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-                title="Buka form revisi terjadwal tanpa login"
-              >
-                <ExternalLink size={10} className="text-emerald-500" />
-                <span>Form Terjadwal</span>
-              </Link>
-              <button
-                type="button"
-                onClick={(e) => handleCopyLinkUrl('/input-form', e)}
-                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Salin tautan form terjadwal"
-              >
-                {copiedLinkUrl === '/input-form' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
-              </button>
-            </div>
-
-            <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
-              <Link
-                href="/iku"
-                target="_blank"
-                className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
-                title="Buka katalog IKU tanpa login"
-              >
-                <ExternalLink size={10} className="text-indigo-500" />
-                <span>Katalog IKU</span>
-              </Link>
-              <button
-                type="button"
-                onClick={(e) => handleCopyLinkUrl('/iku', e)}
-                className="px-1.5 py-1 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
-                title="Salin tautan katalog IKU"
-              >
-                {copiedLinkUrl === '/iku' ? <Check size={11} className="text-emerald-600 stroke-[3]" /> : <Copy size={11} />}
-              </button>
-            </div>
-
-            <Link
-              href="/anggaran/layanan-publik"
-              className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg text-[11px] font-bold shadow-2xs hover:opacity-95 transition-all"
-              title="Buka Pusat Layanan Publik Terpadu"
-            >
-              <Sparkles size={11} />
-              <span>Portal Publik</span>
-            </Link>
           </div>
         </div>
 
@@ -1098,6 +1005,153 @@ export default function MonitoringMakPage() {
               </span>
             </div>
           </button>
+        </div>
+      </div>
+
+      {/* 🌐 KONTAINER TERSENDIRI: FORM PUBLIK & TAUTAN AKSES TERBUKA */}
+      <div className="bg-white/95 backdrop-blur-sm p-3.5 px-4 md:px-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-blue-50 border border-blue-200/70 flex items-center justify-center text-blue-600">
+              <Link2 size={12} />
+            </div>
+            <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+              Form Publik &amp; Tautan Akses Terbuka (Tanpa Login)
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+              • Tautan form input unit dan katalog referensi yang dapat dibagikan langsung
+            </span>
+          </div>
+          <Link
+            href="/anggaran/layanan-publik"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg text-[10.5px] font-bold shadow-2xs hover:opacity-95 transition-all self-start sm:self-auto"
+            title="Buka Pusat Layanan Publik Terpadu"
+          >
+            <Sparkles size={11} />
+            <span>Pusat Portal Publik</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Card Form MAK */}
+          <div className="flex items-center justify-between p-2.5 px-3 bg-slate-50/80 hover:bg-rose-50/40 border border-slate-200/80 hover:border-rose-200 rounded-xl transition-all group shadow-2xs">
+            <Link
+              href="/input-mak"
+              target="_blank"
+              className="flex items-center gap-2 min-w-0 pr-2"
+              title="Buka form input MAK tanpa login"
+            >
+              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <ExternalLink size={13} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 group-hover:text-rose-700 block truncate">
+                  Form Revisi MAK
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block">
+                  Akses /input-mak
+                </span>
+              </div>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer shrink-0"
+              title="Salin tautan form MAK"
+            >
+              {copiedLinkUrl === '/input-mak' ? <Check size={13} className="text-emerald-600 stroke-[3]" /> : <Copy size={13} />}
+            </button>
+          </div>
+
+          {/* Card Form RKAT */}
+          <div className="flex items-center justify-between p-2.5 px-3 bg-slate-50/80 hover:bg-blue-50/40 border border-slate-200/80 hover:border-blue-200 rounded-xl transition-all group shadow-2xs">
+            <Link
+              href="/input-rkat"
+              target="_blank"
+              className="flex items-center gap-2 min-w-0 pr-2"
+              title="Buka form input RKAT tanpa login"
+            >
+              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <ExternalLink size={13} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 group-hover:text-blue-700 block truncate">
+                  Form Perubahan RKAT
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block">
+                  Akses /input-rkat
+                </span>
+              </div>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer shrink-0"
+              title="Salin tautan form RKAT"
+            >
+              {copiedLinkUrl === '/input-rkat' ? <Check size={13} className="text-emerald-600 stroke-[3]" /> : <Copy size={13} />}
+            </button>
+          </div>
+
+          {/* Card Form Terjadwal */}
+          <div className="flex items-center justify-between p-2.5 px-3 bg-slate-50/80 hover:bg-emerald-50/40 border border-slate-200/80 hover:border-emerald-200 rounded-xl transition-all group shadow-2xs">
+            <Link
+              href="/input-form"
+              target="_blank"
+              className="flex items-center gap-2 min-w-0 pr-2"
+              title="Buka form revisi terjadwal tanpa login"
+            >
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <ExternalLink size={13} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 group-hover:text-emerald-700 block truncate">
+                  Form Revisi Terjadwal
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block">
+                  Akses /input-form
+                </span>
+              </div>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-form', e)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer shrink-0"
+              title="Salin tautan form terjadwal"
+            >
+              {copiedLinkUrl === '/input-form' ? <Check size={13} className="text-emerald-600 stroke-[3]" /> : <Copy size={13} />}
+            </button>
+          </div>
+
+          {/* Card Katalog IKU */}
+          <div className="flex items-center justify-between p-2.5 px-3 bg-slate-50/80 hover:bg-indigo-50/40 border border-slate-200/80 hover:border-indigo-200 rounded-xl transition-all group shadow-2xs">
+            <Link
+              href="/iku"
+              target="_blank"
+              className="flex items-center gap-2 min-w-0 pr-2"
+              title="Buka katalog IKU tanpa login"
+            >
+              <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                <ExternalLink size={13} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 block truncate">
+                  Katalog Pemetaan IKU
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block">
+                  Akses /iku
+                </span>
+              </div>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/iku', e)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer shrink-0"
+              title="Salin tautan katalog IKU"
+            >
+              {copiedLinkUrl === '/iku' ? <Check size={13} className="text-emerald-600 stroke-[3]" /> : <Copy size={13} />}
+            </button>
+          </div>
         </div>
       </div>
 

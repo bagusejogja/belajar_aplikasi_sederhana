@@ -116,7 +116,9 @@ export async function GET(req: NextRequest) {
               if (c.program_nama !== null && c.program_nama !== undefined) existing.program_nama = c.program_nama;
               if (c.program_kode !== null && c.program_kode !== undefined) existing.program_kode = c.program_kode;
               if (c.sasaran_nama !== null && c.sasaran_nama !== undefined) existing.sasaran_nama = c.sasaran_nama;
+              if (c.sasaran_kode !== null && c.sasaran_kode !== undefined) existing.sasaran_kode = c.sasaran_kode;
               if (c.tujuan_nama !== null && c.tujuan_nama !== undefined) existing.tujuan_nama = c.tujuan_nama;
+              if (c.tujuan_kode !== null && c.tujuan_kode !== undefined) existing.tujuan_kode = c.tujuan_kode;
               if (c.ref_iku) existing.ref_iku = c.ref_iku;
               if (c.ref_tahun_iku) existing.ref_tahun_iku = c.ref_tahun_iku;
             }
@@ -136,13 +138,13 @@ export async function GET(req: NextRequest) {
                 indikator_program_kode: '',
                 indikator_program_nama: '',
                 sasaran_id: '',
-                sasaran_kode: '',
+                sasaran_kode: c.sasaran_kode || '',
                 sasaran_nama: c.sasaran_nama || '',
                 indikator_sasaran_id: '',
                 indikator_sasaran_kode: '',
                 indikator_sasaran_nama: '',
                 tujuan_id: '',
-                tujuan_kode: '',
+                tujuan_kode: c.tujuan_kode || '',
                 tujuan_nama: c.tujuan_nama || '',
                 indikator_tujuan_id: '',
                 indikator_tujuan_kode: '',
@@ -554,7 +556,9 @@ export async function POST(req: NextRequest) {
         program_nama,
         program_kode,
         sasaran_nama,
+        sasaran_kode,
         tujuan_nama,
+        tujuan_kode,
         ref_iku: inputRefIku,
         ref_tahun_iku: inputTahun
       } = body;
@@ -577,7 +581,9 @@ export async function POST(req: NextRequest) {
             program_nama: program_nama || '',
             program_kode: program_kode || '',
             sasaran_nama: sasaran_nama || '',
+            sasaran_kode: sasaran_kode || '',
             tujuan_nama: tujuan_nama || '',
+            tujuan_kode: tujuan_kode || '',
             ref_iku: cleanRefIku,
             ref_tahun_iku: cleanTahun,
             updated_at: new Date().toISOString()
@@ -589,7 +595,9 @@ export async function POST(req: NextRequest) {
             program_nama: program_nama || '',
             program_kode: program_kode || '',
             sasaran_nama: sasaran_nama || '',
+            sasaran_kode: sasaran_kode || '',
             tujuan_nama: tujuan_nama || '',
+            tujuan_kode: tujuan_kode || '',
             ref_iku: cleanRefIku,
             ref_tahun_iku: cleanTahun
           });
@@ -610,7 +618,9 @@ export async function POST(req: NextRequest) {
               if (program_nama !== undefined) item.program_nama = program_nama;
               if (program_kode !== undefined) item.program_kode = program_kode;
               if (sasaran_nama !== undefined) item.sasaran_nama = sasaran_nama;
+              if (sasaran_kode !== undefined) item.sasaran_kode = sasaran_kode;
               if (tujuan_nama !== undefined) item.tujuan_nama = tujuan_nama;
+              if (tujuan_kode !== undefined) item.tujuan_kode = tujuan_kode;
               item.ref_iku = cleanRefIku;
               item.ref_tahun_iku = cleanTahun;
               saveIkuData(ikuData);
@@ -629,13 +639,13 @@ export async function POST(req: NextRequest) {
               indikator_program_kode: '',
               indikator_program_nama: '',
               sasaran_id: '',
-              sasaran_kode: '',
+              sasaran_kode: sasaran_kode || '',
               sasaran_nama: sasaran_nama || '',
               indikator_sasaran_id: '',
               indikator_sasaran_kode: '',
               indikator_sasaran_nama: '',
               tujuan_id: '',
-              tujuan_kode: '',
+              tujuan_kode: tujuan_kode || '',
               tujuan_nama: tujuan_nama || '',
               indikator_tujuan_id: '',
               indikator_tujuan_kode: '',
