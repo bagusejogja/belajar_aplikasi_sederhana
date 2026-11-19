@@ -100,6 +100,15 @@ const CompressedImage = ({ src, alt, className, style }: any) => {
   return <img src={dataUrl} alt={alt} className={className} style={style} />;
 };
 
+interface LineItem {
+  nama: string;
+  qty: string;
+  satuan: string;
+  harga: string;
+}
+
+const emptyLine = (): LineItem => ({ nama: '', qty: '1', satuan: '', harga: '' });
+
 interface TransaksiPenelitian {
   id: number;
   created_at?: string;
@@ -158,12 +167,29 @@ export default function LaporanCatatanPenelitianPage() {
 
   // Modal Edit Induk Transaksi
   const [editingItem, setEditingItem] = useState<TransaksiPenelitian | null>(null);
+  const [editFormMode, setEditFormMode] = useState<'kasbon' | 'langsung'>('kasbon');
   const [editTanggal, setEditTanggal] = useState<string>('');
   const [editKategori, setEditKategori] = useState<string>('Penelitian');
   const [editNominal, setEditNominal] = useState<string>('');
   const [editUraian, setEditUraian] = useState<string>('');
   const [editCatatan, setEditCatatan] = useState<string>('');
   const [editNamaPenerima, setEditNamaPenerima] = useState<string>('');
+  const [editToko, setEditToko] = useState<string>('');
+  const [editLines, setEditLines] = useState<LineItem[]>([emptyLine()]);
+
+  const totalEditLines = useMemo(
+    () => editLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga) || 0), 0),
+    [editLines]
+  );
+
+  useEffect(() => {
+    if (editFormMode === 'langsung' && totalEditLines > 0) {
+      setEditNominal(String(totalEditLines));
+    }
+  }, [totalEditLines, editFormMode]);
+
+  const setEditLine = (i: number, patch: Partial<LineItem>) =>
+    setEditLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const [editPhotos, setEditPhotos] = useState<{
     nota: string[];
@@ -303,12 +329,30 @@ export default function LaporanCatatanPenelitianPage() {
   // Open Modal Edit Induk
   const handleOpenEdit = (item: TransaksiPenelitian) => {
     setEditingItem(item);
+    const isKasbon = item.tipe_transaksi === 'Kasbon';
+    setEditFormMode(isKasbon ? 'kasbon' : 'langsung');
     setEditTanggal(item.tanggal_transaksi);
     setEditKategori(item.kategori || 'Penelitian');
     setEditNominal(String(item.nominal));
     setEditUraian(item.uraian || '');
     setEditCatatan(item.catatan || '');
     setEditNamaPenerima(item.nama_penerima || '');
+
+    const firstNota = item.notas && item.notas.length > 0 ? item.notas[0] : null;
+    setEditToko(firstNota?.toko || '');
+
+    if (firstNota && Array.isArray(firstNota.items) && firstNota.items.length > 0) {
+      setEditLines(
+        firstNota.items.map((it: any) => ({
+          nama: String(it.nama || ''),
+          qty: String(it.qty ?? '1'),
+          satuan: String(it.satuan || ''),
+          harga: String(it.harga || ''),
+        }))
+      );
+    } else {
+      setEditLines([emptyLine()]);
+    }
 
     setEditPhotos({
       nota: parseUrls(item.foto_nota || item.foto_bukti_1),
@@ -355,27 +399,46 @@ export default function LaporanCatatanPenelitianPage() {
       const finalBarang = [...editPhotos.barang, ...uploadedBarang].filter(Boolean).join(', ');
       const finalTransfer = [...editPhotos.transfer, ...uploadedTransfer].filter(Boolean).join(', ');
 
-      const newNominal = Number(editNominal);
+      const isKasbon = editFormMode === 'kasbon';
+      const numNominal = Number(editNominal);
       const nominalFields: Record<string, number> = {};
-      if (editingItem.tipe_transaksi === 'Kasbon') {
+
+      if (isKasbon) {
         if (editingItem.status_kasbon === 'Selesai') {
-          const awal = Number(editingItem.nominal_kasbon || 0);
-          nominalFields.nominal_realisasi = newNominal;
-          nominalFields.selisih_kasbon = awal - newNominal;
+          const awal = Number(editingItem.nominal_kasbon || numNominal);
+          nominalFields.nominal_realisasi = numNominal;
+          nominalFields.selisih_kasbon = awal - numNominal;
         } else {
-          nominalFields.nominal_kasbon = newNominal;
+          nominalFields.nominal_kasbon = numNominal;
+          nominalFields.nominal_realisasi = 0;
+          nominalFields.selisih_kasbon = numNominal;
         }
       } else {
-        nominalFields.nominal_realisasi = newNominal;
+        nominalFields.nominal_realisasi = numNominal;
+        nominalFields.nominal_kasbon = 0;
+        nominalFields.selisih_kasbon = 0;
       }
+
+      const cleanLines = editLines
+        .map(l => ({
+          nama: l.nama.trim(),
+          qty: Number(l.qty) || 0,
+          satuan: l.satuan.trim(),
+          harga: Number(l.harga) || 0,
+        }))
+        .filter(l => l.nama && l.qty > 0);
 
       const payload = {
         id: editingItem.id,
         ...nominalFields,
+        tipe_transaksi: isKasbon ? 'Kasbon' : 'Pengeluaran Langsung',
+        status_kasbon: isKasbon ? (editingItem.status_kasbon || 'Menunggu Nota') : 'Selesai',
         tanggal_transaksi: editTanggal,
         kategori: editKategori,
-        nominal: newNominal,
+        nominal: numNominal,
         nama_penerima: editNamaPenerima.trim() || null,
+        toko: editToko.trim() || null,
+        items: cleanLines,
         uraian: editUraian.trim(),
         catatan: editCatatan.trim(),
         foto_nota: finalNota,
@@ -400,8 +463,8 @@ export default function LaporanCatatanPenelitianPage() {
       }
 
       toast.success('Transaksi berhasil diperbarui!', { id: toastId });
-      setDataList(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
       setEditingItem(null);
+      fetchData();
     } catch (err: any) {
       toast.error('Error: ' + err.message, { id: toastId });
     } finally {
@@ -1451,170 +1514,399 @@ export default function LaporanCatatanPenelitianPage() {
       {/* ========================================================== */}
       {editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-black text-gray-900">Edit Data Catatan Transaksi #{editingItem.id}</h3>
-              <button onClick={() => setEditingItem(null)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={18} />
-              </button>
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4">
+            
+            {/* Header Modal & Toggle Mode */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 flex-wrap gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold ${
+                  editFormMode === 'kasbon' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                }`}>
+                  {editFormMode === 'kasbon' ? <Wallet size={18} /> : <Receipt size={18} />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">
+                    Edit Transaksi #{editingItem.id}
+                  </h3>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {editFormMode === 'kasbon' 
+                      ? 'Model Kasbon (Uang Muka Kegiatan - Nota diselesaikan kemudian)'
+                      : 'Pengeluaran Langsung (Nota dan barang langsung ada)'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Toggle Mode Kasbon vs Langsung */}
+                <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setEditFormMode('kasbon')}
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                      editFormMode === 'kasbon'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Wallet size={12} />
+                    <span>Model Kasbon</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFormMode('langsung')}
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                      editFormMode === 'langsung'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Receipt size={12} />
+                    <span>Langsung Nota</span>
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setEditingItem(null)} 
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 cursor-pointer"
+                  title="Tutup"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Tanggal</label>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              
+              {/* Baris 1: Tanggal & Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Calendar size={13} className="text-indigo-600" />
+                    <span>{editFormMode === 'kasbon' ? 'Tanggal Penyerahan Kasbon' : 'Tanggal Transaksi'}</span>
+                    <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="date"
                     required
                     value={editTanggal}
                     onChange={(e) => setEditTanggal(e.target.value)}
-                    className="w-full text-xs font-bold border border-gray-200 rounded-xl p-2.5"
+                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-slate-50/50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Kategori</label>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Tag size={13} className="text-indigo-600" />
+                    <span>Kategori Kegiatan</span>
+                    <span className="text-rose-500">*</span>
+                  </label>
                   <select
                     value={editKategori}
                     onChange={(e) => setEditKategori(e.target.value)}
-                    className="w-full text-xs font-bold border border-gray-200 rounded-xl p-2.5"
+                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   >
-                    <option value="Penelitian">Penelitian (Umum)</option>
-                    <option value="Hewan & Bahan Penelitian">Hewan &amp; Bahan Penelitian (Kelinci, dll)</option>
+                    <option value="Penelitian">Penelitian (Umum / Analisis Lab)</option>
+                    <option value="Hewan & Bahan Penelitian">Hewan &amp; Bahan Penelitian (Kelinci, Tikus, Reagen, dll)</option>
                     <option value="Perlengkapan Penelitian">Perlengkapan &amp; Alat Penelitian</option>
-                    <option value="Pengabdian">Pengabdian</option>
-                    <option value="Operasional Lab">Operasional Lab</option>
-                    <option value="Perjalanan Dinas">Perjalanan Dinas</option>
-                    <option value="Konsumsi & Rapat">Konsumsi &amp; Rapat</option>
-                    <option value="Jasa & Honor">Jasa &amp; Honor</option>
+                    <option value="Pengabdian">Pengabdian Masyarakat</option>
+                    <option value="Operasional Lab">Operasional Lab &amp; Fasilitas</option>
+                    <option value="Perjalanan Dinas">Perjalanan Dinas / Transportasi</option>
+                    <option value="Konsumsi & Rapat">Konsumsi &amp; Rapat Koordinasi</option>
+                    <option value="Jasa & Honor">Jasa Profesi / Honor Asisten</option>
                     <option value="Lainnya">Lainnya</option>
                   </select>
                 </div>
               </div>
 
-              {editingItem.tipe_transaksi === 'Kasbon' && (
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Nama Penerima Kasbon (PIC)</label>
+              {/* Baris 2: PIC & Toko / Tempat Pembelian */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <UserCheck size={13} className={editFormMode === 'kasbon' ? 'text-amber-600' : 'text-indigo-600'} />
+                    <span>{editFormMode === 'kasbon' ? 'Nama Penerima Kasbon (PIC / Peneliti)' : 'Nama Pembeli / Penanggung Jawab (PIC)'}</span>
+                    {editFormMode === 'kasbon' && <span className="text-rose-500">*</span>}
+                  </label>
                   <input
                     type="text"
+                    required={editFormMode === 'kasbon'}
                     value={editNamaPenerima}
                     onChange={(e) => setEditNamaPenerima(e.target.value)}
-                    className="w-full text-xs font-bold border border-gray-200 rounded-xl p-2.5"
+                    placeholder="Contoh: Dr. Budi Santoso / Mas Dinar"
+                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-gray-400"
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">
-                  {editingItem.tipe_transaksi === 'Kasbon'
-                    ? (editingItem.status_kasbon === 'Selesai' ? 'Nominal Belanja Riil (Rp)' : 'Nominal Kasbon (Rp)')
-                    : 'Nominal (Rp)'}
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={editNominal}
-                  onChange={(e) => setEditNominal(e.target.value)}
-                  className="w-full text-xs font-bold border border-gray-200 rounded-xl p-2.5 font-mono"
-                />
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Tag size={13} className="text-indigo-600" />
+                    <span>Toko / Tempat Pembelian / Supplier (Opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editToko}
+                    onChange={(e) => setEditToko(e.target.value)}
+                    placeholder="Contoh: Toko Kimia Jaya / Peternakan Kelinci"
+                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-gray-400"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Uraian Kegiatan</label>
+              {/* Baris 3: Rincian Barang Belanja (Tabel Nota Itemized) */}
+              <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                    <Receipt size={13} className="text-indigo-600" />
+                    <span>Rincian Barang Belanja (Nota)</span>
+                  </label>
+                  <span className="text-[10px] text-gray-500">Volume, satuan &amp; harga otomatis menghitung total</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="hidden sm:grid grid-cols-12 gap-1.5 text-[10px] font-black uppercase text-gray-500 px-1">
+                    <div className="col-span-4">Nama Barang</div>
+                    <div className="col-span-2 text-center">Volume</div>
+                    <div className="col-span-2 text-center">Satuan</div>
+                    <div className="col-span-2 text-right">Harga Satuan (Rp)</div>
+                    <div className="col-span-2 text-right">Subtotal (Rp)</div>
+                  </div>
+
+                  {editLines.map((l, i) => {
+                    const sub = (Number(l.qty) || 0) * (Number(l.harga) || 0);
+                    return (
+                      <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
+                        <input
+                          value={l.nama}
+                          onChange={(e) => setEditLine(i, { nama: e.target.value })}
+                          placeholder="Contoh: Reagen Kimia / Kelinci"
+                          className="col-span-12 sm:col-span-4 text-xs font-bold border border-gray-200 rounded-lg p-2 bg-white"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={l.qty}
+                          onChange={(e) => setEditLine(i, { qty: e.target.value })}
+                          placeholder="Vol"
+                          className="col-span-3 sm:col-span-2 text-xs font-mono font-bold border border-gray-200 rounded-lg p-2 bg-white text-center"
+                        />
+                        <input
+                          value={l.satuan}
+                          onChange={(e) => setEditLine(i, { satuan: e.target.value })}
+                          placeholder="ekor/botol"
+                          className="col-span-3 sm:col-span-2 text-xs border border-gray-200 rounded-lg p-2 bg-white text-center"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={l.harga}
+                          onChange={(e) => setEditLine(i, { harga: e.target.value })}
+                          placeholder="0"
+                          className="col-span-4 sm:col-span-2 text-xs font-mono font-bold border border-gray-200 rounded-lg p-2 bg-white text-right"
+                        />
+                        <div className="col-span-2 flex items-center justify-end gap-1">
+                          <span className="text-[11px] font-mono font-black text-gray-800">{formatRupiah(sub)}</span>
+                          {editLines.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setEditLines((p) => p.filter((_, idx) => idx !== i))}
+                              className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                              title="Hapus baris"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditLines((p) => [...p, emptyLine()])}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-dashed border-indigo-300 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                    >
+                      <PlusCircle size={12} /> Tambah Baris Barang
+                    </button>
+                    {totalEditLines > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-mono">
+                          Total Rincian: {formatRupiah(totalEditLines)}
+                        </span>
+                        {editNominal !== String(totalEditLines) && (
+                          <button
+                            type="button"
+                            onClick={() => setEditNominal(String(totalEditLines))}
+                            className="text-[10px] text-indigo-600 hover:underline font-bold"
+                          >
+                            Terapkan ke Nominal
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Baris 4: Nominal Transaksi */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-gray-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <DollarSign size={13} className={editFormMode === 'kasbon' ? 'text-amber-600' : 'text-emerald-600'} />
+                    <span>
+                      {editFormMode === 'kasbon' 
+                        ? (editingItem.status_kasbon === 'Selesai' ? 'Nominal Realisasi Belanja (Rp)' : 'Nominal Uang Kasbon (Uang Muka)')
+                        : 'Total Nominal Pengeluaran Riil (Rp)'}
+                    </span>
+                    <span className="text-rose-500">*</span>
+                  </span>
+                  {editNominal && !isNaN(Number(editNominal)) && Number(editNominal) > 0 && (
+                    <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-mono">
+                      {formatRupiah(Number(editNominal))}
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">Rp</span>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="any"
+                    value={editNominal}
+                    onChange={(e) => setEditNominal(e.target.value)}
+                    placeholder="0"
+                    className="w-full text-xs font-bold text-gray-900 border border-gray-200 rounded-xl p-2.5 pl-10 bg-slate-50/50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Baris 5: Uraian Kegiatan */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                  <FileText size={13} className="text-indigo-600" />
+                  <span>Uraian Rincian Kegiatan</span>
+                  <span className="text-rose-500">*</span>
+                </label>
                 <textarea
                   required
                   rows={2}
                   value={editUraian}
                   onChange={(e) => setEditUraian(e.target.value)}
-                  className="w-full text-xs font-medium border border-gray-200 rounded-xl p-2.5"
+                  placeholder="Deskripsikan kebutuhan belanja / tujuan kegiatan..."
+                  className="w-full text-xs font-medium border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Catatan Tambahan</label>
+              {/* Baris 6: Catatan Tambahan */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                  <Tag size={13} className="text-indigo-600" />
+                  <span>Catatan Tambahan (Opsional)</span>
+                </label>
                 <input
                   type="text"
                   value={editCatatan}
                   onChange={(e) => setEditCatatan(e.target.value)}
-                  className="w-full text-xs font-medium border border-gray-200 rounded-xl p-2.5"
+                  placeholder="Keterangan tambahan jika diperlukan..."
+                  className="w-full text-xs font-medium border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                 />
               </div>
 
-              {/* Lampiran Pendukung */}
-              <div className="space-y-2.5 pt-1">
-                <label className="text-xs font-black text-gray-800 block">Lampiran Pendukung</label>
-                {([
-                  ['nota', 'Foto Nota / Kuitansi'],
-                  ['kegiatan', 'Foto Kegiatan'],
-                  ['barang', 'Foto Barang / Hewan'],
-                  ['transfer', 'Bukti Transfer / Kasbon'],
-                ] as const).map(([key, label]) => (
-                  <div key={key} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl space-y-1.5">
-                    <div className="text-[11px] font-bold text-gray-700">{label}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {editPhotos[key].map((url, i) => (
-                        <div key={url + i} className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold shadow-2xs">
-                          <a href={getSafeFileUrl(url)} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
-                            File {i + 1}
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => setEditPhotos(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
-                            className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
-                            title="Hapus lampiran"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                      ))}
-                      {editNewFiles[key].map((f, i) => (
-                        <div key={f.name + i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold text-emerald-800 shadow-2xs">
-                          <span className="max-w-[140px] truncate">{f.name} (baru)</span>
-                          <button
-                            type="button"
-                            onClick={() => setEditNewFiles(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
-                            className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                      ))}
-                      {editPhotos[key].length === 0 && editNewFiles[key].length === 0 && (
-                        <span className="text-[10px] text-gray-400 font-medium">Belum ada lampiran</span>
-                      )}
+              {/* Baris 7: 4 Kategori Lampiran Berkas */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="text-xs font-black text-gray-800 block">
+                  Lampiran Berkas Pendukung (4 Kategori)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    ['nota', '1. Foto Nota / Kuitansi'],
+                    ['kegiatan', '2. Foto Kegiatan / Pelaksanaan'],
+                    ['barang', '3. Foto Fisik Barang / Hewan'],
+                    ['transfer', '4. Bukti Transfer / Kasbon'],
+                  ] as const).map(([key, label]) => (
+                    <div key={key} className="p-3 bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
+                      <div className="text-[11px] font-bold text-gray-700">{label}</div>
+                      
+                      <div className="flex flex-wrap gap-1.5 min-h-[28px] items-center">
+                        {editPhotos[key].map((url, i) => (
+                          <div key={url + i} className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold shadow-2xs">
+                            <a href={getSafeFileUrl(url)} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                              File {i + 1}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => setEditPhotos(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
+                              className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                              title="Hapus lampiran ini"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                        {editNewFiles[key].map((f, i) => (
+                          <div key={f.name + i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold text-emerald-800 shadow-2xs">
+                            <span className="max-w-[120px] truncate">{f.name} (baru)</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditNewFiles(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
+                              className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                        {editPhotos[key].length === 0 && editNewFiles[key].length === 0 && (
+                          <span className="text-[10px] text-gray-400 font-medium">Belum ada lampiran</span>
+                        )}
+                      </div>
+
+                      <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-dashed border-indigo-300 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors w-fit">
+                        <Upload size={12} />
+                        <span>Tambah File</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const picked = Array.from(e.target.files || []);
+                            if (picked.length) setEditNewFiles(prev => ({ ...prev, [key]: [...prev[key], ...picked] }));
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
                     </div>
-                    <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-dashed border-indigo-300 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors">
-                      <Upload size={12} />
-                      <span>Tambah File</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const picked = Array.from(e.target.files || []);
-                          if (picked.length) setEditNewFiles(prev => ({ ...prev, [key]: [...prev[key], ...picked] }));
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdating}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs cursor-pointer shadow-2xs disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  {isUpdating ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Menyimpan Perubahan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={13} />
+                      <span>Simpan Perubahan</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

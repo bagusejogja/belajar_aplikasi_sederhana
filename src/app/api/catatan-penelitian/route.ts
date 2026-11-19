@@ -568,6 +568,79 @@ export async function PUT(request: Request) {
       throw error;
     }
 
+    // Jika ada rincian barang/nota yang disertakan pada saat edit
+    if (Array.isArray(body.items)) {
+      try {
+        const cleanItems = body.items
+          .map((r: any) => ({
+            nama: String(r.nama || '').trim(),
+            qty: Number(r.qty) || 0,
+            satuan: String(r.satuan || '').trim(),
+            harga: Number(r.harga) || 0,
+          }))
+          .filter((r: any) => r.nama && r.qty > 0);
+
+        const totalItems = cleanItems.reduce((s: number, r: any) => s + r.qty * r.harga, 0);
+
+        const { data: existingNotas } = await supabaseAdmin
+          .from('catatan_penelitian_nota')
+          .select('*')
+          .eq('kasbon_id', id)
+          .order('id', { ascending: true });
+
+        if (cleanItems.length > 0) {
+          if (existingNotas && existingNotas.length > 0) {
+            await supabaseAdmin
+              .from('catatan_penelitian_nota')
+              .update({
+                tanggal_nota: tanggal_transaksi || existingNotas[0].tanggal_nota || new Date().toISOString().split('T')[0],
+                toko: body.toko ? String(body.toko).trim() : null,
+                items: cleanItems,
+                total: totalItems,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingNotas[0].id);
+          } else {
+            await supabaseAdmin
+              .from('catatan_penelitian_nota')
+              .insert([{
+                kasbon_id: id,
+                tanggal_nota: tanggal_transaksi || new Date().toISOString().split('T')[0],
+                toko: body.toko ? String(body.toko).trim() : null,
+                items: cleanItems,
+                total: totalItems,
+              }]);
+          }
+        } else if (existingNotas && existingNotas.length === 1 && body.items.length === 0) {
+          await supabaseAdmin
+            .from('catatan_penelitian_nota')
+            .delete()
+            .eq('id', existingNotas[0].id);
+        }
+      } catch (notaSyncErr) {
+        console.warn('Nota sync warning on PUT:', notaSyncErr);
+      }
+    } else if (body.toko !== undefined) {
+      try {
+        const { data: existingNotas } = await supabaseAdmin
+          .from('catatan_penelitian_nota')
+          .select('id')
+          .eq('kasbon_id', id)
+          .order('id', { ascending: true });
+        if (existingNotas && existingNotas.length > 0) {
+          await supabaseAdmin
+            .from('catatan_penelitian_nota')
+            .update({
+              toko: body.toko ? String(body.toko).trim() : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingNotas[0].id);
+        }
+      } catch (tokoSyncErr) {
+        console.warn('Toko sync warning on PUT:', tokoSyncErr);
+      }
+    }
+
     const resItem = {
       ...data,
       foto_nota: data.foto_bukti_1,

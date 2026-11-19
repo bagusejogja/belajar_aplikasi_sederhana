@@ -41,6 +41,9 @@ interface Mutasi {
   uraian: string;
   keluar: number;
   masuk: number;
+  isPendingKasbon?: boolean;
+  statusKasbon?: string;
+  sisaBelumNota?: number;
 }
 
 const rp = (n: number) =>
@@ -87,6 +90,9 @@ export default function MutasiKasPage() {
       const selisih = awal - riil;
 
       if (isKasbon) {
+        const isPending = it.status_kasbon !== 'Selesai';
+        const sisaBelumNota = Math.max(0, awal - riil);
+
         // 1. Kasbon Diserahkan (Uang keluar dari kas)
         rows.push({
           key: `k-${it.id}`,
@@ -96,6 +102,9 @@ export default function MutasiKasPage() {
           uraian: it.uraian,
           keluar: awal,
           masuk: 0,
+          isPendingKasbon: isPending,
+          statusKasbon: it.status_kasbon,
+          sisaBelumNota,
         });
 
         // 2. Jika kasbon sudah Selesai
@@ -302,6 +311,7 @@ export default function MutasiKasPage() {
         No: i + 1,
         Tanggal: m.tanggal,
         Jenis: m.jenis,
+        Status: m.isPendingKasbon ? `BELUM SELESAI (Sisa Rp ${m.sisaBelumNota || 0})` : 'SELESAI',
         'PIC / Penerima': m.pic,
         Uraian: m.uraian,
         'Uang Keluar': m.keluar,
@@ -310,7 +320,7 @@ export default function MutasiKasPage() {
       }))
     );
     wsM['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 26 }, { wch: 24 }, 
+      { wch: 5 }, { wch: 12 }, { wch: 26 }, { wch: 28 }, { wch: 24 }, 
       { wch: 45 }, { wch: 16 }, { wch: 18 }, { wch: 20 }
     ];
     XLSX.utils.book_append_sheet(wb, wsM, 'Buku_Mutasi_Kas');
@@ -533,40 +543,79 @@ export default function MutasiKasPage() {
             /* ========================================================== */
             /* TABEL BUKU MUTASI KAS                                      */
             /* ========================================================== */
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-gray-200">
-                <tr>
-                  <th className="py-2.5 px-3 w-28">Tanggal</th>
-                  <th className="py-2.5 px-3 w-40">Jenis Transaksi</th>
-                  <th className="py-2.5 px-3 w-36">PIC / Penerima</th>
-                  <th className="py-2.5 px-3">Uraian Transaksi</th>
-                  <th className="py-2.5 px-3 text-right w-32 text-rose-800">Uang Keluar</th>
-                  <th className="py-2.5 px-3 text-right w-32 text-emerald-800">Uang Masuk</th>
-                  <th className="py-2.5 px-3 text-right w-36 font-black">Saldo Bersih Keluar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {mutasiWithSaldo.length === 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2 text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200/90 px-3 py-2 rounded-xl font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                <span>Baris berlatar oranye/kuning menandakan <strong>Kasbon Belum Selesai</strong> (masih menunggu nota belanja atau pengembalian sisa uang).</span>
+              </div>
+
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-gray-200">
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-400 font-bold">
-                      Belum ada catatan mutasi uang
-                    </td>
+                    <th className="py-2.5 px-3 w-28">Tanggal</th>
+                    <th className="py-2.5 px-3 w-48">Jenis Transaksi</th>
+                    <th className="py-2.5 px-3 w-36">PIC / Penerima</th>
+                    <th className="py-2.5 px-3">Uraian Transaksi</th>
+                    <th className="py-2.5 px-3 text-right w-32 text-rose-800">Uang Keluar</th>
+                    <th className="py-2.5 px-3 text-right w-32 text-emerald-800">Uang Masuk</th>
+                    <th className="py-2.5 px-3 text-right w-36 font-black">Saldo Bersih Keluar</th>
                   </tr>
-                ) : (
-                  mutasiWithSaldo.map((m) => (
-                    <tr key={m.key} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3 font-mono text-gray-700 whitespace-nowrap">{m.tanggal}</td>
-                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap">{m.jenis}</td>
-                      <td className="py-2.5 px-3 text-gray-800">{m.pic}</td>
-                      <td className="py-2.5 px-3 text-gray-700 max-w-sm truncate" title={m.uraian}>{m.uraian}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-rose-700 font-bold">{m.keluar ? rp(m.keluar) : '-'}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-bold">{m.masuk ? rp(m.masuk) : '-'}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-gray-950">{rp(m.saldo)}</td>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {mutasiWithSaldo.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-gray-400 font-bold">
+                        Belum ada catatan mutasi uang
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    mutasiWithSaldo.map((m) => {
+                      const isPending = m.isPendingKasbon;
+                      return (
+                        <tr 
+                          key={m.key} 
+                          className={`transition-colors ${
+                            isPending 
+                              ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500' 
+                              : 'hover:bg-slate-50/80'
+                          }`}
+                        >
+                          <td className={`py-2.5 px-3 font-mono whitespace-nowrap ${isPending ? 'text-amber-950 font-bold' : 'text-gray-700'}`}>
+                            {m.tanggal}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`font-bold ${isPending ? 'text-amber-950' : 'text-gray-900'}`}>{m.jenis}</span>
+                              {isPending && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-200 text-amber-950 border border-amber-400 w-fit">
+                                  <Clock size={10} className="text-amber-700 animate-pulse" />
+                                  Kasbon Belum Selesai (Sisa: {rp(m.sisaBelumNota || 0)})
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className={`py-2.5 px-3 font-bold ${isPending ? 'text-amber-950' : 'text-gray-800'}`}>
+                            {m.pic}
+                          </td>
+                          <td className={`py-2.5 px-3 max-w-sm truncate ${isPending ? 'text-amber-900 font-medium' : 'text-gray-700'}`} title={m.uraian}>
+                            {m.uraian}
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-mono font-bold ${isPending ? 'text-amber-950 bg-amber-100/50' : 'text-rose-700'}`}>
+                            {m.keluar ? rp(m.keluar) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-bold">
+                            {m.masuk ? rp(m.masuk) : '-'}
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-mono font-black ${isPending ? 'text-amber-950' : 'text-gray-950'}`}>
+                            {rp(m.saldo)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
