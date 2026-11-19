@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   FileSpreadsheet, 
@@ -35,6 +35,15 @@ import NotaKasbonModal from '@/components/NotaKasbonModal';
 
 type AttachmentState = { files: File[]; url: string };
 
+interface LineItem {
+  nama: string;
+  qty: string;
+  satuan: string;
+  harga: string;
+}
+
+const emptyLine = (): LineItem => ({ nama: '', qty: '1', satuan: '', harga: '' });
+
 interface KasbonItem {
   id: number;
   tanggal_transaksi: string;
@@ -67,9 +76,25 @@ export default function CatatanPenelitianInputPage() {
   const [tanggal, setTanggal] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [kategori, setKategori] = useState<string>('Penelitian');
   const [namaPenerima, setNamaPenerima] = useState<string>('');
+  const [toko, setToko] = useState<string>('');
+  const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
   const [nominal, setNominal] = useState<string>('');
   const [uraian, setUraian] = useState<string>('');
   const [catatan, setCatatan] = useState<string>('');
+
+  const totalLines = useMemo(
+    () => lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga) || 0), 0),
+    [lines]
+  );
+
+  useEffect(() => {
+    if (formMode === 'langsung' && totalLines > 0) {
+      setNominal(String(totalLines));
+    }
+  }, [totalLines, formMode]);
+
+  const setLine = (i: number, patch: Partial<LineItem>) =>
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   // 4 Kategori Lampiran Foto Bukti
   const [attachments, setAttachments] = useState<{
@@ -248,6 +273,15 @@ export default function CatatanPenelitianInputPage() {
       const isKasbon = formMode === 'kasbon';
       const numNominal = Number(nominal);
 
+      const cleanLines = lines
+        .map(l => ({
+          nama: l.nama.trim(),
+          qty: Number(l.qty) || 0,
+          satuan: l.satuan.trim(),
+          harga: Number(l.harga) || 0,
+        }))
+        .filter(l => l.nama && l.qty > 0);
+
       const payload = {
         tanggal_transaksi: tanggal,
         kategori,
@@ -256,10 +290,12 @@ export default function CatatanPenelitianInputPage() {
         catatan: catatan.trim(),
         tipe_transaksi: isKasbon ? 'Kasbon' : 'Pengeluaran Langsung',
         status_kasbon: isKasbon ? 'Menunggu Nota' : 'Selesai',
-        nama_penerima: isKasbon ? namaPenerima.trim() : null,
+        nama_penerima: namaPenerima.trim() || null,
         nominal_kasbon: isKasbon ? numNominal : 0,
         nominal_realisasi: isKasbon ? 0 : numNominal,
         selisih_kasbon: isKasbon ? numNominal : 0,
+        toko: toko.trim() || null,
+        items: cleanLines.length > 0 ? cleanLines : undefined,
         foto_bukti_1: notaUrl || null,
         foto_bukti_2: kegiatanUrl || null,
         foto_bukti_3: barangUrl || null,
@@ -281,13 +317,15 @@ export default function CatatanPenelitianInputPage() {
       toast.success(
         isKasbon
           ? `Kasbon Rp ${numNominal.toLocaleString('id-ID')} untuk ${namaPenerima} berhasil dicatat!`
-          : 'Pengeluaran & berkas foto berhasil dicatat!',
+          : 'Pengeluaran langsung & rincian nota berhasil dicatat!',
         { id: toastId }
       );
 
       // Reset form
       setNominal('');
       setNamaPenerima('');
+      setToko('');
+      setLines([emptyLine()]);
       setUraian('');
       setCatatan('');
       setAttachments({
@@ -593,22 +631,131 @@ export default function CatatanPenelitianInputPage() {
               </div>
             </div>
 
-            {/* Jika Mode Kasbon: Input Nama Penerima Kasbon (PIC) */}
-            {formMode === 'kasbon' && (
+            {/* Input Nama Penerima / Penanggung Jawab (PIC) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1">
                 <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                  <UserCheck size={13} className="text-amber-600" />
-                  <span>Nama Penerima / Pemegang Kasbon (PIC / Peneliti)</span>
-                  <span className="text-rose-500">*</span>
+                  <UserCheck size={13} className={formMode === 'kasbon' ? 'text-amber-600' : 'text-indigo-600'} />
+                  <span>{formMode === 'kasbon' ? 'Nama Penerima Kasbon (PIC / Peneliti)' : 'Nama Pembeli / Penanggung Jawab (PIC)'}</span>
+                  {formMode === 'kasbon' && <span className="text-rose-500">*</span>}
                 </label>
                 <input
                   type="text"
-                  required
+                  required={formMode === 'kasbon'}
                   value={namaPenerima}
                   onChange={(e) => setNamaPenerima(e.target.value)}
-                  placeholder="Contoh: Dr. Budi Santoso / Mas Ardi (Laboran)"
-                  className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition-all placeholder:text-gray-400"
+                  placeholder="Contoh: Dr. Budi Santoso / Mas Dinar"
+                  className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-gray-400"
                 />
+              </div>
+
+              {formMode === 'langsung' ? (
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Tag size={13} className="text-indigo-600" />
+                    <span>Toko / Tempat Pembelian / Supplier (Opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={toko}
+                    onChange={(e) => setToko(e.target.value)}
+                    placeholder="Contoh: Toko Kimia Jaya / Peternakan Kelinci"
+                    className="w-full text-xs font-bold text-gray-800 border border-gray-200 rounded-xl p-2.5 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-gray-400"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center text-[11px] text-amber-800 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/80">
+                  <span>Kasbon akan tercatat atas nama PIC ini dan muncul pada rekap monitoring kasbon &amp; mutasi.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Rincian Barang Belanja (Nota) khusus Pengeluaran Langsung */}
+            {formMode === 'langsung' && (
+              <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                    <Receipt size={13} className="text-indigo-600" />
+                    <span>Rincian Barang Belanja (Nota)</span>
+                  </label>
+                  <span className="text-[10px] text-gray-500">Volume, satuan &amp; harga otomatis menghitung total</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="hidden sm:grid grid-cols-12 gap-1.5 text-[10px] font-black uppercase text-gray-500 px-1">
+                    <div className="col-span-4">Nama Barang</div>
+                    <div className="col-span-2 text-center">Volume</div>
+                    <div className="col-span-2 text-center">Satuan</div>
+                    <div className="col-span-2 text-right">Harga Satuan (Rp)</div>
+                    <div className="col-span-2 text-right">Subtotal (Rp)</div>
+                  </div>
+
+                  {lines.map((l, i) => {
+                    const sub = (Number(l.qty) || 0) * (Number(l.harga) || 0);
+                    return (
+                      <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
+                        <input
+                          value={l.nama}
+                          onChange={(e) => setLine(i, { nama: e.target.value })}
+                          placeholder="Contoh: Reagen Kimia / Kelinci"
+                          className="col-span-12 sm:col-span-4 text-xs font-bold border border-gray-200 rounded-lg p-2 bg-white"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={l.qty}
+                          onChange={(e) => setLine(i, { qty: e.target.value })}
+                          placeholder="Vol"
+                          className="col-span-3 sm:col-span-2 text-xs font-mono font-bold border border-gray-200 rounded-lg p-2 bg-white text-center"
+                        />
+                        <input
+                          value={l.satuan}
+                          onChange={(e) => setLine(i, { satuan: e.target.value })}
+                          placeholder="ekor/botol"
+                          className="col-span-3 sm:col-span-2 text-xs border border-gray-200 rounded-lg p-2 bg-white text-center"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={l.harga}
+                          onChange={(e) => setLine(i, { harga: e.target.value })}
+                          placeholder="0"
+                          className="col-span-4 sm:col-span-2 text-xs font-mono font-bold border border-gray-200 rounded-lg p-2 bg-white text-right"
+                        />
+                        <div className="col-span-2 flex items-center justify-end gap-1">
+                          <span className="text-[11px] font-mono font-black text-gray-800">{formatRupiah(sub)}</span>
+                          {lines.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+                              className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                              title="Hapus baris"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setLines((p) => [...p, emptyLine()])}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-dashed border-indigo-300 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                    >
+                      <PlusCircle size={12} /> Tambah Baris Barang
+                    </button>
+                    {totalLines > 0 && (
+                      <span className="text-[11px] font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 font-mono">
+                        Total Rincian: {formatRupiah(totalLines)}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -617,7 +764,7 @@ export default function CatatanPenelitianInputPage() {
               <label className="text-xs font-black text-gray-700 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <DollarSign size={13} className={formMode === 'kasbon' ? 'text-amber-600' : 'text-emerald-600'} />
-                  <span>{formMode === 'kasbon' ? 'Nominal Uang Kasbon (Uang Muka)' : 'Nominal Pengeluaran Riil (Rp)'}</span>
+                  <span>{formMode === 'kasbon' ? 'Nominal Uang Kasbon (Uang Muka)' : 'Total Nominal Pengeluaran Riil (Rp)'}</span>
                   <span className="text-rose-500">*</span>
                 </span>
                 {nominal && !isNaN(Number(nominal)) && Number(nominal) > 0 && (

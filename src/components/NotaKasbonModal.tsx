@@ -22,6 +22,7 @@ export interface KasbonForNota {
   nominal_kasbon?: number;
   nama_penerima?: string | null;
   uraian: string;
+  tipe_transaksi?: string;
   status_kasbon: string;
   catatan_penyelesaian?: string | null;
   notas?: NotaRow[];
@@ -64,6 +65,7 @@ export default function NotaKasbonModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const isKasbon = kasbon.tipe_transaksi === 'Kasbon';
   const kasbonAwal = Number(kasbon.nominal_kasbon || kasbon.nominal || 0);
   const notas = kasbon.notas || [];
   const sudahDinota = notas.reduce((s, n) => s + Number(n.total || 0), 0);
@@ -311,7 +313,9 @@ export default function NotaKasbonModal({
               <Receipt size={22} />
             </div>
             <div>
-              <h3 className="text-base font-black text-gray-900">Nota Belanja Kasbon #{kasbon.id}</h3>
+              <h3 className="text-base font-black text-gray-900">
+                {isKasbon ? 'Nota Belanja Kasbon #' : 'Rincian Nota Pengeluaran #'}{kasbon.id}
+              </h3>
               <p className="text-[11px] text-gray-500 font-medium">
                 {kasbon.nama_penerima ? `PIC: ${kasbon.nama_penerima} · ` : ''}
                 {kasbon.uraian}
@@ -323,22 +327,34 @@ export default function NotaKasbonModal({
           </button>
         </div>
 
-        {/* Ringkasan Dana Kasbon */}
+        {/* Ringkasan Dana Kasbon / Pengeluaran */}
         <div className="grid grid-cols-3 gap-2.5">
           <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 shadow-2xs">
-            <div className="text-[10px] font-black uppercase text-amber-700">Dana Kasbon Awal</div>
-            <div className="font-mono font-black text-sm sm:text-base text-amber-900 mt-0.5">{rp(kasbonAwal)}</div>
+            <div className="text-[10px] font-black uppercase text-amber-700">
+              {isKasbon ? 'Dana Kasbon Awal' : 'Total Transaksi'}
+            </div>
+            <div className="font-mono font-black text-sm sm:text-base text-amber-900 mt-0.5">
+              {rp(isKasbon ? kasbonAwal : Number(kasbon.nominal || 0))}
+            </div>
           </div>
           <div className="p-3 rounded-2xl bg-blue-50/80 border border-blue-200 shadow-2xs">
-            <div className="text-[10px] font-black uppercase text-blue-700">Sudah Dinota ({notas.length}x)</div>
+            <div className="text-[10px] font-black uppercase text-blue-700">Sudah Dirinci ({notas.length} Nota)</div>
             <div className="font-mono font-black text-sm sm:text-base text-blue-900 mt-0.5">{rp(sudahDinota)}</div>
           </div>
-          <div className={`p-3 rounded-2xl border shadow-2xs ${sisaSetelah >= 0 ? 'bg-emerald-50/80 border-emerald-200' : 'bg-rose-50/80 border-rose-200'}`}>
-            <div className={`text-[10px] font-black uppercase ${sisaSetelah >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {sisaSetelah >= 0 ? 'Sisa Kasbon Lebih' : 'Kurang / Nombok'}
+          <div className={`p-3 rounded-2xl border shadow-2xs ${
+            !isKasbon 
+              ? 'bg-slate-50 border-slate-200' 
+              : (sisaSetelah >= 0 ? 'bg-emerald-50/80 border-emerald-200' : 'bg-rose-50/80 border-rose-200')
+          }`}>
+            <div className={`text-[10px] font-black uppercase ${
+              !isKasbon ? 'text-slate-600' : (sisaSetelah >= 0 ? 'text-emerald-700' : 'text-rose-700')
+            }`}>
+              {!isKasbon ? 'Total Rincian Nota' : (sisaSetelah >= 0 ? 'Sisa Kasbon Lebih' : 'Kurang / Nombok')}
             </div>
-            <div className={`font-mono font-black text-sm sm:text-base mt-0.5 ${sisaSetelah >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
-              {rp(Math.abs(sisaSetelah))}
+            <div className={`font-mono font-black text-sm sm:text-base mt-0.5 ${
+              !isKasbon ? 'text-slate-900' : (sisaSetelah >= 0 ? 'text-emerald-900' : 'text-rose-900')
+            }`}>
+              {!isKasbon ? rp(sudahDinota + totalNotaInput) : rp(Math.abs(sisaSetelah))}
             </div>
           </div>
         </div>
@@ -598,6 +614,16 @@ export default function NotaKasbonModal({
             >
               <CheckCircle2 size={13} />
               <span>{saving ? 'Menyimpan Perubahan...' : 'Simpan Perubahan Nota Ini'}</span>
+            </button>
+          ) : !isKasbon ? (
+            <button 
+              type="button" 
+              disabled={saving || (!hasNewNota && notas.length === 0)} 
+              onClick={() => submit(true)} 
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-xs font-black cursor-pointer inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+            >
+              <Receipt size={13} /> 
+              <span>Simpan Rincian Nota</span>
             </button>
           ) : (
             <>

@@ -1107,18 +1107,18 @@ export default function LaporanCatatanPenelitianPage() {
                         <td className="py-2.5 px-3 align-top text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
                             
-                            {/* Tombol Input / Tambah Nota */}
-                            {isWaiting && (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedKasbonToSettle(item)}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer active:scale-95"
-                                title="Tambah nota / rincian belanja kasbon"
-                              >
-                                <Receipt size={11} />
-                                <span>{(item.nota_count || 0) > 0 ? '+ Nota' : 'Nota'}</span>
-                              </button>
-                            )}
+                            {/* Tombol Input / Kelola Rincian Nota */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKasbonToSettle(item)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-white rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                                isWaiting ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                              }`}
+                              title={isKasbon ? "Kelola / tambah nota belanja kasbon" : "Lihat / kelola rincian nota & foto belanja"}
+                            >
+                              <Receipt size={11} />
+                              <span>{isWaiting ? ((item.nota_count || 0) > 0 ? '+ Nota' : 'Nota') : 'Nota'}</span>
+                            </button>
 
                             {/* Tombol Buka Kembali */}
                             {isDone && (

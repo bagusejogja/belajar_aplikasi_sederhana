@@ -82,14 +82,14 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    // Lampirkan daftar nota per kasbon (tabel opsional)
-    const kasbonIds = (data || []).filter((r: any) => r.tipe_transaksi === 'Kasbon').map((r: any) => r.id);
+    // Lampirkan daftar nota per transaksi (baik kasbon maupun pengeluaran langsung)
+    const allIds = (data || []).map((r: any) => r.id);
     const notaMap = new Map<string, any[]>();
-    if (kasbonIds.length > 0) {
+    if (allIds.length > 0) {
       const { data: notaRows, error: notaErr } = await supabaseAdmin
         .from('catatan_penelitian_nota')
         .select('*')
-        .in('kasbon_id', kasbonIds)
+        .in('kasbon_id', allIds)
         .order('tanggal_nota', { ascending: true })
         .order('id', { ascending: true });
       if (!notaErr) {
@@ -440,6 +440,32 @@ export async function POST(request: Request) {
         });
       }
       throw error;
+    }
+
+    // Jika pengguna menyertakan rincian barang (items) pada pengeluaran langsung atau kasbon awal
+    if (data && data.id && Array.isArray(body.items) && body.items.length > 0) {
+      const cleanItems = body.items
+        .map((r: any) => ({
+          nama: String(r.nama || '').trim(),
+          qty: Number(r.qty) || 0,
+          satuan: String(r.satuan || '').trim(),
+          harga: Number(r.harga) || 0,
+        }))
+        .filter((r: any) => r.nama && r.qty > 0);
+
+      if (cleanItems.length > 0) {
+        const totalItems = cleanItems.reduce((s: number, r: any) => s + r.qty * r.harga, 0);
+        await supabaseAdmin.from('catatan_penelitian_nota').insert([{
+          kasbon_id: data.id,
+          tanggal_nota: tanggal_transaksi || new Date().toISOString().split('T')[0],
+          toko: body.toko ? String(body.toko).trim() : null,
+          keterangan: body.keterangan ? String(body.keterangan).trim() : null,
+          items: cleanItems,
+          total: totalItems > 0 ? totalItems : nominalNum,
+          foto_nota: notaVal,
+          foto_barang: barangVal,
+        }]);
+      }
     }
 
     const resItem = {
