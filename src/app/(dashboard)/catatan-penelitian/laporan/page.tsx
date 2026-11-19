@@ -356,11 +356,28 @@ export default function LaporanCatatanPenelitianPage() {
       const finalBarang = [...editPhotos.barang, ...uploadedBarang].filter(Boolean).join(', ');
       const finalTransfer = [...editPhotos.transfer, ...uploadedTransfer].filter(Boolean).join(', ');
 
+      const newNominal = Number(editNominal);
+      const nominalFields: Record<string, number> = {};
+      if (editingItem.tipe_transaksi === 'Kasbon') {
+        if (editingItem.status_kasbon === 'Selesai') {
+          // Kasbon selesai: nominal yang diedit = belanja riil, selisih dihitung ulang
+          const awal = Number(editingItem.nominal_kasbon || 0);
+          nominalFields.nominal_realisasi = newNominal;
+          nominalFields.selisih_kasbon = awal - newNominal;
+        } else {
+          // Masih menunggu nota: nominal yang diedit = nominal kasbon
+          nominalFields.nominal_kasbon = newNominal;
+        }
+      } else {
+        nominalFields.nominal_realisasi = newNominal;
+      }
+
       const payload = {
         id: editingItem.id,
+        ...nominalFields,
         tanggal_transaksi: editTanggal,
         kategori: editKategori,
-        nominal: Number(editNominal),
+        nominal: newNominal,
         nama_penerima: editNamaPenerima.trim() || null,
         uraian: editUraian.trim(),
         catatan: editCatatan.trim(),
@@ -1290,7 +1307,11 @@ export default function LaporanCatatanPenelitianPage() {
               )}
 
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Nominal (Rp)</label>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  {editingItem.tipe_transaksi === 'Kasbon'
+                    ? (editingItem.status_kasbon === 'Selesai' ? 'Nominal Belanja Riil (Rp)' : 'Nominal Kasbon (Rp)')
+                    : 'Nominal (Rp)'}
+                </label>
                 <input
                   type="number"
                   required
@@ -1319,6 +1340,68 @@ export default function LaporanCatatanPenelitianPage() {
                   onChange={(e) => setEditCatatan(e.target.value)}
                   className="w-full text-xs font-medium border border-gray-200 rounded-xl p-2.5"
                 />
+              </div>
+
+              {/* Lampiran Pendukung */}
+              <div className="space-y-2.5 pt-1">
+                <label className="text-xs font-black text-gray-800 block">Lampiran Pendukung</label>
+                {([
+                  ['nota', 'Foto Nota / Kuitansi'],
+                  ['kegiatan', 'Foto Kegiatan'],
+                  ['barang', 'Foto Barang / Hewan'],
+                  ['transfer', 'Bukti Transfer / Kasbon'],
+                ] as const).map(([key, label]) => (
+                  <div key={key} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl space-y-1.5">
+                    <div className="text-[11px] font-bold text-gray-700">{label}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {editPhotos[key].map((url, i) => (
+                        <div key={url + i} className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold">
+                          <a href={getSafeFileUrl(url)} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                            File {i + 1}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setEditPhotos(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
+                            className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                            title="Hapus lampiran"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {editNewFiles[key].map((f, i) => (
+                        <div key={f.name + i} className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg pl-2 pr-1 py-1 text-[10px] font-bold text-emerald-800">
+                          <span className="max-w-[140px] truncate">{f.name} (baru)</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditNewFiles(prev => ({ ...prev, [key]: prev[key].filter((_, idx) => idx !== i) }))}
+                            className="p-0.5 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {editPhotos[key].length === 0 && editNewFiles[key].length === 0 && (
+                        <span className="text-[10px] text-gray-400 font-medium">Belum ada lampiran</span>
+                      )}
+                    </div>
+                    <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-dashed border-indigo-300 text-indigo-700 rounded-lg text-[11px] font-bold cursor-pointer">
+                      <Upload size={12} />
+                      <span>Tambah File</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const picked = Array.from(e.target.files || []);
+                          if (picked.length) setEditNewFiles(prev => ({ ...prev, [key]: [...prev[key], ...picked] }));
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
