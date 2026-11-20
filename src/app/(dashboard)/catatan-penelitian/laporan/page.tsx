@@ -33,7 +33,9 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
-  ArrowRight
+  ArrowRight,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -157,10 +159,11 @@ export default function LaporanCatatanPenelitianPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
 
-  // Modal Foto Preview
+  // Modal Foto Preview & Zoom
   const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
   const [previewTitle, setPreviewTitle] = useState<string>('');
   const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
+  const [previewZoom, setPreviewZoom] = useState<number>(1);
 
   // Modal Selesaikan / Tambah Nota Kasbon
   const [selectedKasbonToSettle, setSelectedKasbonToSettle] = useState<TransaksiPenelitian | null>(null);
@@ -181,12 +184,6 @@ export default function LaporanCatatanPenelitianPage() {
     () => editLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga) || 0), 0),
     [editLines]
   );
-
-  useEffect(() => {
-    if (editFormMode === 'langsung' && totalEditLines > 0) {
-      setEditNominal(String(totalEditLines));
-    }
-  }, [totalEditLines, editFormMode]);
 
   const setEditLine = (i: number, patch: Partial<LineItem>) =>
     setEditLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -339,7 +336,7 @@ export default function LaporanCatatanPenelitianPage() {
     setEditNamaPenerima(item.nama_penerima || '');
 
     const firstNota = item.notas && item.notas.length > 0 ? item.notas[0] : null;
-    setEditToko(firstNota?.toko || '');
+    setEditToko((item as any).toko || firstNota?.toko || '');
 
     if (firstNota && Array.isArray(firstNota.items) && firstNota.items.length > 0) {
       setEditLines(
@@ -615,6 +612,7 @@ export default function LaporanCatatanPenelitianPage() {
     setPreviewTitle(title);
     setPreviewPhotos(urls);
     setActivePhotoIdx(0);
+    setPreviewZoom(1);
   };
 
   // Pagination
@@ -935,25 +933,24 @@ export default function LaporanCatatanPenelitianPage() {
                 <tr>
                   <th className="py-2.5 px-2.5 text-center w-10">No</th>
                   <th className="py-2.5 px-3 w-28">Tanggal</th>
-                  <th className="py-2.5 px-3 w-36">Status</th>
-                  <th className="py-2.5 px-3 w-40">Kategori &amp; PIC</th>
+                  <th className="py-2.5 px-3 w-44">Status, Kategori &amp; PIC</th>
                   <th className="py-2.5 px-3">Uraian &amp; Rincian Nota</th>
                   <th className="py-2.5 px-3 text-right w-40">Kasbon / Realisasi</th>
                   <th className="py-2.5 px-2.5 text-center w-32">Foto Bukti</th>
-                  <th className="py-2.5 px-3 text-center w-28">Aksi</th>
+                  <th className="py-2.5 px-2.5 text-center w-28">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-14 text-center text-gray-400">
+                    <td colSpan={7} className="py-14 text-center text-gray-400">
                       <RefreshCw size={22} className="animate-spin text-indigo-600 mx-auto mb-1.5" />
                       <span>Memuat data catatan penelitian...</span>
                     </td>
                   </tr>
                 ) : paginatedData.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-14 text-center text-gray-400 space-y-1.5">
+                    <td colSpan={7} className="py-14 text-center text-gray-400 space-y-1.5">
                       <FileText size={28} className="mx-auto text-gray-300" />
                       <p className="font-bold text-gray-600 text-xs">Tidak ada data transaksi pada filter ini.</p>
                       <p className="text-[11px] text-gray-400">Silakan ubah kata kunci atau rentang tanggal pencarian.</p>
@@ -989,47 +986,45 @@ export default function LaporanCatatanPenelitianPage() {
                         {/* Tanggal */}
                         <td className="py-2.5 px-3 font-bold text-gray-800 align-top whitespace-nowrap">
                           <div className="font-mono text-xs">{item.tanggal_transaksi}</div>
-                          {item.tanggal_penyelesaian && (
+                          {isKasbon && isDone && item.tanggal_penyelesaian && (
                             <div className="text-[10px] text-emerald-700 font-medium">
-                              Selesai: {item.tanggal_penyelesaian}
+                              SPJ Selesai: {item.tanggal_penyelesaian}
                             </div>
                           )}
                         </td>
 
-                        {/* Status */}
+                        {/* Status, Kategori & PIC (Digabung Atas Bawah) */}
                         <td className="py-2.5 px-3 align-top space-y-1">
-                          {isWaiting ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                              <Clock size={10} />
-                              <span>{(item.nota_count || 0) > 0 ? `Terbuka (${item.nota_count} nota)` : 'Menunggu Nota'}</span>
-                            </span>
-                          ) : isDone ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                              <CheckCircle2 size={10} />
-                              <span>Selesai SPJ</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-800 border border-indigo-200">
-                              <Receipt size={10} />
-                              <span>Langsung Nota</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Kategori & PIC */}
-                        <td className="py-2.5 px-3 align-top space-y-0.5">
-                          <span className="text-[11px] font-black text-gray-800 block line-clamp-1" title={item.kategori}>
+                          <div>
+                            {isWaiting ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                <Clock size={10} />
+                                <span>{(item.nota_count || 0) > 0 ? `Terbuka (${item.nota_count} nota)` : 'Menunggu Nota'}</span>
+                              </span>
+                            ) : isDone ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                <CheckCircle2 size={10} />
+                                <span>Selesai SPJ</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                <Receipt size={10} />
+                                <span>Langsung Nota</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-black text-gray-800 line-clamp-1" title={item.kategori}>
                             {item.kategori}
-                          </span>
+                          </div>
                           {item.nama_penerima ? (
-                            <span className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                            <div className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
                               <UserCheck size={11} className="shrink-0" />
                               <span className="truncate max-w-[140px]" title={item.nama_penerima}>
                                 {item.nama_penerima}
                               </span>
-                            </span>
+                            </div>
                           ) : (
-                            <span className="text-[10px] text-gray-400">-</span>
+                            <div className="text-[10px] text-gray-400">-</div>
                           )}
                         </td>
 
@@ -1166,55 +1161,58 @@ export default function LaporanCatatanPenelitianPage() {
                           )}
                         </td>
 
-                        {/* Aksi */}
-                        <td className="py-2.5 px-3 align-top text-center">
-                          <div className="flex items-center justify-center gap-1 flex-wrap">
-                            
-                            {/* Tombol Input / Kelola Rincian Nota */}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedKasbonToSettle(item)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-white rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer active:scale-95 ${
-                                isWaiting ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                              }`}
-                              title={isKasbon ? "Kelola / tambah nota belanja kasbon" : "Lihat / kelola rincian nota & foto belanja"}
-                            >
-                              <Receipt size={11} />
-                              <span>{isWaiting ? ((item.nota_count || 0) > 0 ? '+ Nota' : 'Nota') : 'Nota'}</span>
-                            </button>
-
-                            {/* Tombol Buka Kembali */}
-                            {isDone && (
+                        {/* Aksi (2 Baris Seragam) */}
+                        <td className="py-2.5 px-2.5 align-top text-center whitespace-nowrap">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            {/* Baris 1: Tombol Kelola Nota */}
+                            <div className="flex items-center justify-center gap-1">
                               <button
                                 type="button"
-                                onClick={() => handleReopenKasbon(item)}
-                                className="inline-flex items-center gap-1 px-1.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                                title="Buka kembali karena masih ada nota susulan"
+                                onClick={() => setSelectedKasbonToSettle(item)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-white rounded-lg text-[10px] font-black shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                                  isWaiting ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                                }`}
+                                title={isKasbon ? "Kelola / tambah nota belanja kasbon" : "Lihat / kelola rincian nota & foto belanja"}
                               >
-                                <RotateCcw size={10} />
-                                <span>Buka</span>
+                                <Receipt size={11} />
+                                <span>{isWaiting ? ((item.nota_count || 0) > 0 ? '+ Nota' : 'Nota') : 'Nota'}</span>
                               </button>
-                            )}
 
-                            {/* Tombol Edit Induk */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(item)}
-                              className="p-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 rounded-lg border border-slate-200 transition-all cursor-pointer"
-                              title="Edit Data Transaksi"
-                            >
-                              <Edit3 size={12} />
-                            </button>
+                              {isDone && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReopenKasbon(item)}
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                                  title="Buka kembali karena masih ada nota susulan"
+                                >
+                                  <RotateCcw size={10} />
+                                  <span>Buka</span>
+                                </button>
+                              )}
+                            </div>
 
-                            {/* Tombol Hapus */}
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(item.id)}
-                              className="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg border border-slate-200 transition-all cursor-pointer"
-                              title="Hapus Data"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            {/* Baris 2: Tombol Edit & Hapus Seragam */}
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(item)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-md border border-slate-200 text-[10px] font-bold transition-all cursor-pointer"
+                                title="Edit Data Transaksi"
+                              >
+                                <Edit3 size={11} />
+                                <span>Edit</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item.id)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 rounded-md border border-slate-200 text-[10px] font-bold transition-all cursor-pointer"
+                                title="Hapus Data"
+                              >
+                                <Trash2 size={11} />
+                                <span>Hapus</span>
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1915,58 +1913,135 @@ export default function LaporanCatatanPenelitianPage() {
       )}
 
       {/* ========================================================== */}
-      {/* 🖼️ MODAL GALLERY PREVIEW FOTO LAMPIRAN                      */}
+      {/* 🖼️ MODAL GALLERY PREVIEW FOTO LAMPIRAN DENGAN ZOOM         */}
       {/* ========================================================== */}
       {previewPhotos.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-2xl overflow-hidden flex flex-col p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <h4 className="text-xs font-black text-gray-800">{previewTitle} ({activePhotoIdx + 1} dari {previewPhotos.length})</h4>
-              <button onClick={() => setPreviewPhotos([])} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={18} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden flex flex-col p-4 sm:p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-gray-800">
+                  {previewTitle} ({activePhotoIdx + 1} dari {previewPhotos.length})
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Controls Zoom untuk Gambar */}
+                {!/\.pdf($|\?)/i.test(previewPhotos[activePhotoIdx]) && (
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(prev => Math.max(0.5, prev - 0.25))}
+                      className="p-1 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 cursor-pointer"
+                      title="Perkecil Zoom"
+                    >
+                      <ZoomOut size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono font-bold px-1.5 text-gray-700">
+                      {Math.round(previewZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(prev => Math.min(4, prev + 0.25))}
+                      className="p-1 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 cursor-pointer"
+                      title="Perbesar Zoom"
+                    >
+                      <ZoomIn size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(1)}
+                      className="px-1.5 py-0.5 text-[9px] font-black bg-white rounded-lg text-gray-700 hover:text-indigo-600 border border-gray-200 cursor-pointer"
+                      title="Reset Zoom"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => {
+                    setPreviewPhotos([]);
+                    setPreviewZoom(1);
+                  }} 
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
+            <div 
+              className="relative aspect-video sm:h-[60vh] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-2 select-none"
+              onWheel={(e) => {
+                if (/\.pdf($|\?)/i.test(previewPhotos[activePhotoIdx])) return;
+                e.preventDefault();
+                setPreviewZoom(prev => Math.min(4, Math.max(0.5, prev + (e.deltaY < 0 ? 0.2 : -0.2))));
+              }}
+            >
               {/\.pdf($|\?)/i.test(previewPhotos[activePhotoIdx]) ? (
-                <a
-                  href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 bg-white text-slate-900 rounded-xl text-xs font-black"
-                >
-                  Buka File PDF
-                </a>
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-slate-800 text-white p-6 rounded-xl">
+                  <FileText size={48} className="text-rose-400" />
+                  <p className="text-xs font-bold text-slate-200">Berkas Lampiran PDF</p>
+                  <a
+                    href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Buka File PDF di Tab Baru</span>
+                    <ArrowRight size={13} />
+                  </a>
+                </div>
               ) : (
-                <img
-                  key={previewPhotos[activePhotoIdx]}
-                  src={getSafeFileUrl(previewPhotos[activePhotoIdx])}
-                  alt="Bukti Lampiran"
-                  className="max-h-full max-w-full object-contain"
-                />
+                <div 
+                  className="w-full h-full flex items-center justify-center overflow-auto cursor-zoom-in"
+                  onClick={() => setPreviewZoom(prev => (prev === 1 ? 2 : prev === 2 ? 3 : 1))}
+                  title="Klik untuk zoom (1x -> 2x -> 3x -> 1x) atau gunakan scroll mouse untuk zoom"
+                >
+                  <img
+                    key={previewPhotos[activePhotoIdx]}
+                    src={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+                    alt="Bukti Lampiran"
+                    style={{ transform: `scale(${previewZoom})`, transition: 'transform 0.15s ease-out' }}
+                    className="max-h-full max-w-full object-contain pointer-events-none"
+                  />
+                </div>
               )}
             </div>
 
-            <a
-              href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] font-bold text-indigo-600 hover:underline self-center"
-            >
-              Buka di tab baru
-            </a>
+            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
+              <span>Gunakan scroll mouse atau klik gambar untuk memperbesar zoom</span>
+              <a
+                href={getSafeFileUrl(previewPhotos[activePhotoIdx])}
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-600 font-bold hover:underline"
+              >
+                Buka di tab baru
+              </a>
+            </div>
 
             {previewPhotos.length > 1 && (
-              <div className="flex items-center justify-center gap-2 overflow-x-auto py-1">
+              <div className="flex items-center justify-center gap-2 overflow-x-auto py-1 border-t border-gray-100 pt-2">
                 {previewPhotos.map((url, i) => (
                   <button
                     key={i}
-                    onClick={() => setActivePhotoIdx(i)}
-                    className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                      activePhotoIdx === i ? 'border-indigo-600 scale-105' : 'border-transparent opacity-60'
+                    onClick={() => {
+                      setActivePhotoIdx(i);
+                      setPreviewZoom(1);
+                    }}
+                    className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                      activePhotoIdx === i ? 'border-indigo-600 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <img src={getSafeFileUrl(url)} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
+                    {/\.pdf($|\?)/i.test(url) ? (
+                      <div className="w-full h-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-[9px]">
+                        PDF
+                      </div>
+                    ) : (
+                      <img src={getSafeFileUrl(url)} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
+                    )}
                   </button>
                 ))}
               </div>

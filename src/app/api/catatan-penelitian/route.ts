@@ -103,16 +103,19 @@ export async function GET(request: Request) {
 
     const items = (data || []).map((row: any) => {
       const notas = notaMap.get(String(row.id)) || [];
+      const isKasbon = (row.tipe_transaksi || 'Pengeluaran Langsung') === 'Kasbon';
       return {
         ...row,
         notas,
+        toko: row.toko || notas[0]?.toko || '',
         nota_count: notas.length,
         tipe_transaksi: row.tipe_transaksi || 'Pengeluaran Langsung',
-        status_kasbon: row.status_kasbon || (row.tipe_transaksi === 'Kasbon' ? 'Menunggu Nota' : 'Selesai'),
+        status_kasbon: row.status_kasbon || (isKasbon ? 'Menunggu Nota' : 'Selesai'),
         nama_penerima: row.nama_penerima || '',
-        nominal_kasbon: Number(row.nominal_kasbon || (row.tipe_transaksi === 'Kasbon' ? row.nominal : 0)),
-        nominal_realisasi: Number(row.nominal_realisasi || (row.status_kasbon === 'Selesai' ? row.nominal : 0)),
+        nominal_kasbon: Number(row.nominal_kasbon || (isKasbon ? row.nominal : 0)),
+        nominal_realisasi: Number(row.nominal_realisasi || (!isKasbon || row.status_kasbon === 'Selesai' ? row.nominal : 0)),
         selisih_kasbon: Number(row.selisih_kasbon || 0),
+        tanggal_penyelesaian: isKasbon && row.status_kasbon === 'Selesai' ? row.tanggal_penyelesaian : null,
         foto_nota: row.foto_nota || row.foto_bukti_1,
         foto_kegiatan: row.foto_kegiatan || row.foto_bukti_2,
         foto_barang: row.foto_barang || row.foto_bukti_3,
@@ -399,7 +402,7 @@ export async function POST(request: Request) {
     const barangVal = foto_barang || foto_bukti_3 || null;
     const transferVal = foto_bukti_transfer || foto_bukti_4 || null;
 
-    const record = {
+    const record: any = {
       tanggal_transaksi: tanggal_transaksi || new Date().toISOString().split('T')[0],
       kategori: kategori || 'Penelitian',
       nominal: isKasbon && initStatusKasbon === 'Menunggu Nota' ? initNominalKasbon : (initNominalRealisasi || nominalNum),
@@ -408,10 +411,11 @@ export async function POST(request: Request) {
       tipe_transaksi: isKasbon ? 'Kasbon' : 'Pengeluaran Langsung',
       status_kasbon: initStatusKasbon,
       nama_penerima: nama_penerima ? nama_penerima.trim() : null,
+      toko: body.toko ? String(body.toko).trim() : null,
       nominal_kasbon: initNominalKasbon,
       nominal_realisasi: initNominalRealisasi,
       selisih_kasbon: initSelisih,
-      tanggal_penyelesaian: initStatusKasbon === 'Selesai' ? (tanggal_penyelesaian || tanggal_transaksi) : null,
+      tanggal_penyelesaian: (isKasbon && initStatusKasbon === 'Selesai') ? (tanggal_penyelesaian || tanggal_transaksi) : null,
       catatan_penyelesaian: catatan_penyelesaian ? catatan_penyelesaian.trim() : null,
       foto_bukti_1: notaVal,
       foto_bukti_2: kegiatanVal,
@@ -422,11 +426,23 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('catatan_penelitian')
       .insert([record])
       .select()
       .single();
+
+    if (error && error.message?.includes('toko')) {
+      const recordWithoutToko = { ...record };
+      delete recordWithoutToko.toko;
+      const retry = await supabaseAdmin
+        .from('catatan_penelitian')
+        .insert([recordWithoutToko])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === 'PGRST205' || error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
@@ -543,7 +559,10 @@ export async function PUT(request: Request) {
     if (nominal_kasbon !== undefined) updateData.nominal_kasbon = Number(nominal_kasbon);
     if (nominal_realisasi !== undefined) updateData.nominal_realisasi = Number(nominal_realisasi);
     if (selisih_kasbon !== undefined) updateData.selisih_kasbon = Number(selisih_kasbon);
-    if (tanggal_penyelesaian !== undefined) updateData.tanggal_penyelesaian = tanggal_penyelesaian;
+    if (body.toko !== undefined) updateData.toko = body.toko ? String(body.toko).trim() : null;
+    if (tanggal_penyelesaian !== undefined) {
+      updateData.tanggal_penyelesaian = (tipe_transaksi === 'Kasbon' && status_kasbon === 'Selesai') ? tanggal_penyelesaian : null;
+    }
     if (catatan_penyelesaian !== undefined) updateData.catatan_penyelesaian = catatan_penyelesaian;
 
     if (notaVal !== undefined) updateData.foto_bukti_1 = notaVal;
@@ -551,12 +570,25 @@ export async function PUT(request: Request) {
     if (barangVal !== undefined) updateData.foto_bukti_3 = barangVal;
     if (transferVal !== undefined) updateData.foto_bukti_4 = transferVal;
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('catatan_penelitian')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && error.message?.includes('toko')) {
+      const updateWithoutToko = { ...updateData };
+      delete updateWithoutToko.toko;
+      const retry = await supabaseAdmin
+        .from('catatan_penelitian')
+        .update(updateWithoutToko)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       // Fallback update in-memory

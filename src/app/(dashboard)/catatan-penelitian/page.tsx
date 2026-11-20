@@ -27,7 +27,10 @@ import {
   AlertTriangle,
   RotateCcw,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CatatanPenelitianTabs from '@/components/CatatanPenelitianTabs';
@@ -108,6 +111,10 @@ export default function CatatanPenelitianInputPage() {
     barang: { files: [], url: '' },
     transfer: { files: [], url: '' }
   });
+
+  // Preview Modal File & Interactive Zoom saat Input
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; isPdf: boolean } | null>(null);
+  const [previewZoom, setPreviewZoom] = useState<number>(1);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [tableNotCreated, setTableNotCreated] = useState<boolean>(false);
@@ -880,21 +887,51 @@ export default function CatatanPenelitianInputPage() {
                         </label>
                       </div>
 
-                      {/* Preview list */}
+                      {/* Preview list file dengan thumbnail & klik zoom/view */}
                       {fileCount > 0 && (
-                        <div className="mt-1.5 space-y-1 text-left max-h-16 overflow-y-auto">
-                          {attachments[typeKey].files.map((f, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-[9px] bg-white p-1 rounded border border-gray-200">
-                              <span className="truncate max-w-[70px] text-gray-700">{f.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => removeFile(typeKey, idx)}
-                                className="text-rose-500 hover:text-rose-700"
-                              >
-                                <X size={10} />
-                              </button>
-                            </div>
-                          ))}
+                        <div className="mt-2 space-y-1.5 text-left max-h-36 overflow-y-auto pr-0.5">
+                          {attachments[typeKey].files.map((f, idx) => {
+                            const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+                            return (
+                              <div key={idx} className="flex items-center justify-between gap-1.5 text-[10px] bg-white p-1 rounded-xl border border-gray-200 shadow-2xs hover:border-indigo-300 transition-all">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreviewFile({
+                                      url: URL.createObjectURL(f),
+                                      name: f.name,
+                                      isPdf
+                                    });
+                                    setPreviewZoom(1);
+                                  }}
+                                  className="flex items-center gap-1.5 min-w-0 text-left hover:text-indigo-600 cursor-pointer flex-1"
+                                  title="Klik untuk pratinjau / zoom"
+                                >
+                                  {isPdf ? (
+                                    <div className="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200 font-bold text-[8px]">
+                                      PDF
+                                    </div>
+                                  ) : (
+                                    <img
+                                      src={URL.createObjectURL(f)}
+                                      alt={f.name}
+                                      className="w-6 h-6 rounded-md object-cover shrink-0 border border-gray-200"
+                                    />
+                                  )}
+                                  <span className="truncate max-w-[70px] font-bold text-gray-700">{f.name}</span>
+                                  <Eye size={10} className="text-gray-400 shrink-0 ml-auto" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFile(typeKey, idx)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer shrink-0"
+                                  title="Hapus file"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1051,6 +1088,117 @@ export default function CatatanPenelitianInputPage() {
           onClose={() => setSelectedKasbonToSettle(null)}
           onSaved={() => { setSelectedKasbonToSettle(null); fetchActiveKasbon(); }}
         />
+      )}
+
+      {/* Modal Pratinjau Berkas & Scroll/Click Zoom saat Input */}
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden flex flex-col p-4 sm:p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                {previewFile.isPdf ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">PDF</span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-700">Gambar</span>
+                )}
+                <h4 className="text-xs font-black text-gray-800 truncate max-w-md">{previewFile.name}</h4>
+              </div>
+              <div className="flex items-center gap-2">
+                {!previewFile.isPdf && (
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(prev => Math.max(0.5, prev - 0.25))}
+                      className="p-1 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 cursor-pointer"
+                      title="Perkecil Zoom"
+                    >
+                      <ZoomOut size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono font-bold px-1.5 text-gray-700">
+                      {Math.round(previewZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(prev => Math.min(4, prev + 0.25))}
+                      className="p-1 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 cursor-pointer"
+                      title="Perbesar Zoom"
+                    >
+                      <ZoomIn size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(1)}
+                      className="px-1.5 py-0.5 text-[9px] font-black bg-white rounded-lg text-gray-700 hover:text-indigo-600 border border-gray-200 cursor-pointer"
+                      title="Reset Zoom"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    URL.revokeObjectURL(previewFile.url);
+                    setPreviewFile(null);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div 
+              className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-2 select-none"
+              onWheel={(e) => {
+                if (previewFile.isPdf) return;
+                e.preventDefault();
+                setPreviewZoom(prev => Math.min(4, Math.max(0.5, prev + (e.deltaY < 0 ? 0.2 : -0.2))));
+              }}
+            >
+              {previewFile.isPdf ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-slate-800 text-white p-6 rounded-xl">
+                  <FileText size={48} className="text-rose-400" />
+                  <p className="text-xs font-bold text-slate-200">{previewFile.name}</p>
+                  <a
+                    href={previewFile.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Buka Dokumen PDF di Tab Baru</span>
+                    <ArrowRight size={13} />
+                  </a>
+                </div>
+              ) : (
+                <div 
+                  className="w-full h-full flex items-center justify-center overflow-auto cursor-zoom-in"
+                  onClick={() => setPreviewZoom(prev => (prev === 1 ? 2 : prev === 2 ? 3 : 1))}
+                  title="Klik untuk zoom (1x -> 2x -> 3x -> 1x) atau gunakan mouse wheel scroll zoom"
+                >
+                  <img
+                    src={previewFile.url}
+                    alt={previewFile.name}
+                    style={{ transform: `scale(${previewZoom})`, transition: 'transform 0.15s ease-out' }}
+                    className="max-h-full max-w-full object-contain pointer-events-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+              <span>{previewFile.isPdf ? 'Berkas PDF siap diunggah' : 'Gunakan scroll mouse atau klik gambar untuk zoom'}</span>
+              <a
+                href={previewFile.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-600 font-bold hover:underline"
+              >
+                Buka ukuran penuh di tab baru
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

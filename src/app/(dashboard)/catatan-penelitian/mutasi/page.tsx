@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { RefreshCw, Download, Search, ArrowDownCircle, ArrowUpCircle, Users, BookOpen, Clock, CheckCircle2, Wallet, Receipt } from 'lucide-react';
+import { RefreshCw, Download, Search, ArrowDownCircle, ArrowUpCircle, Users, BookOpen, Clock, CheckCircle2, Wallet, Receipt, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import CatatanPenelitianTabs from '@/components/CatatanPenelitianTabs';
@@ -554,8 +554,7 @@ export default function MutasiKasPage() {
                   <tr>
                     <th className="py-2.5 px-3 w-28">Tanggal</th>
                     <th className="py-2.5 px-3 w-48">Jenis Transaksi</th>
-                    <th className="py-2.5 px-3 w-36">PIC / Penerima</th>
-                    <th className="py-2.5 px-3">Uraian Transaksi</th>
+                    <th className="py-2.5 px-3">Uraian Transaksi &amp; PIC</th>
                     <th className="py-2.5 px-3 text-right w-32 text-rose-800">Uang Keluar</th>
                     <th className="py-2.5 px-3 text-right w-32 text-emerald-800">Uang Masuk</th>
                     <th className="py-2.5 px-3 text-right w-36 font-black">Saldo Bersih Keluar</th>
@@ -564,7 +563,7 @@ export default function MutasiKasPage() {
                 <tbody className="divide-y divide-gray-100">
                   {mutasiWithSaldo.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-gray-400 font-bold">
+                      <td colSpan={6} className="py-12 text-center text-gray-400 font-bold">
                         Belum ada catatan mutasi uang
                       </td>
                     </tr>
@@ -580,10 +579,10 @@ export default function MutasiKasPage() {
                               : 'hover:bg-slate-50/80'
                           }`}
                         >
-                          <td className={`py-2.5 px-3 font-mono whitespace-nowrap ${isPending ? 'text-amber-950 font-bold' : 'text-gray-700'}`}>
+                          <td className={`py-2.5 px-3 font-mono whitespace-nowrap align-top ${isPending ? 'text-amber-950 font-bold' : 'text-gray-700'}`}>
                             {m.tanggal}
                           </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">
+                          <td className="py-2.5 px-3 whitespace-nowrap align-top">
                             <div className="flex flex-col gap-0.5">
                               <span className={`font-bold ${isPending ? 'text-amber-950' : 'text-gray-900'}`}>{m.jenis}</span>
                               {isPending && (
@@ -594,19 +593,24 @@ export default function MutasiKasPage() {
                               )}
                             </div>
                           </td>
-                          <td className={`py-2.5 px-3 font-bold ${isPending ? 'text-amber-950' : 'text-gray-800'}`}>
-                            {m.pic}
+                          <td className="py-2.5 px-3 align-top">
+                            <div className={`font-medium ${isPending ? 'text-amber-950 font-bold' : 'text-gray-900'}`} title={m.uraian}>
+                              {m.uraian}
+                            </div>
+                            {m.pic && m.pic !== '-' && (
+                              <div className={`text-[11px] font-bold flex items-center gap-1 mt-0.5 ${isPending ? 'text-amber-800' : 'text-indigo-600'}`}>
+                                <UserCheck size={11} className="shrink-0" />
+                                <span>PIC: {m.pic}</span>
+                              </div>
+                            )}
                           </td>
-                          <td className={`py-2.5 px-3 max-w-sm truncate ${isPending ? 'text-amber-900 font-medium' : 'text-gray-700'}`} title={m.uraian}>
-                            {m.uraian}
-                          </td>
-                          <td className={`py-2.5 px-3 text-right font-mono font-bold ${isPending ? 'text-amber-950 bg-amber-100/50' : 'text-rose-700'}`}>
+                          <td className={`py-2.5 px-3 text-right font-mono font-bold align-top ${isPending ? 'text-amber-950 bg-amber-100/50' : 'text-rose-700'}`}>
                             {m.keluar ? rp(m.keluar) : '-'}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-bold">
+                          <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-bold align-top">
                             {m.masuk ? rp(m.masuk) : '-'}
                           </td>
-                          <td className={`py-2.5 px-3 text-right font-mono font-black ${isPending ? 'text-amber-950' : 'text-gray-950'}`}>
+                          <td className={`py-2.5 px-3 text-right font-mono font-black align-top ${isPending ? 'text-amber-950' : 'text-gray-950'}`}>
                             {rp(m.saldo)}
                           </td>
                         </tr>
